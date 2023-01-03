@@ -26,6 +26,7 @@
 #ifndef __CORE__STORY_FILE_H__
 #define __CORE__STORY_FILE_H__
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -37,7 +38,9 @@ typedef enum {
   STORY_FILE_RESOURCE_PICTURE_PLACEHOLDER,
   STORY_FILE_RESOURCE_SOUND_AIFF,
   STORY_FILE_RESOURCE_SOUND_OGG,
-  STORY_FILE_RESOURCE_SOUND_MOD
+  STORY_FILE_RESOURCE_SOUND_MOD,
+  STORY_FILE_RESOURCE_ZCODE,
+  STORY_FILE_RESOURCE_NONE
 } StoryFileResourceType;
 
 typedef struct
@@ -51,12 +54,18 @@ typedef struct
 
 typedef struct
 {
-  uint8_t           *data;      // Bytes del story file
-  size_t             size;      // Nombre de bytes
-  StoryFileResource *resources; // Llista de 'resources'
-  uint32_t           Nres;      // Nombre de 'resources'
-  FILE              *fres;      // Descriptor fitxer on llegir
-                                // 'resources'.
+  uint8_t           *data;         // Bytes del story file
+  size_t             size;         // Nombre de bytes
+  StoryFileResource *resources;    // Llista de 'resources'
+  uint32_t           Nres;         // Nombre de 'resources'
+  FILE              *fres;         // Descriptor fitxer on llegir
+                                   // 'resources'.
+  char              *raw_metadata; // Raw metadata en format XML. Pot
+                                   // ser NULL.
+  uint32_t           frontispiece; // Resource que s'utilitza com a
+                                   // "portada". Sempre serà de tipus
+                                   // 'PICTURE'. Si el seu valor es >=
+                                   // Nres vol dir que no hi ha.
 } StoryFile;
 
 
@@ -71,5 +80,16 @@ story_file_new_from_file_name (
                                const char  *file_name,
                                char       **err
                                );
+
+// Llig el resource indicat en memòria. La memòria ha de tindre espai
+// suficient per a llegir el resource.
+// NOTA!! resource ha de ser un índex vàlid.
+bool
+story_file_read_resource (
+                          StoryFile       *sf,
+                          const uint32_t   resource,
+                          uint8_t         *mem,
+                          char           **err
+                          );
 
 #endif // __CORE__STORY_FILE_H__

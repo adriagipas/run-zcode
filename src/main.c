@@ -165,6 +165,15 @@ int main ( int argc, char *argv[] )
       exit ( EXIT_FAILURE );
     }
   printf ( "SF size: %lu\n", sf->size );
+  uint32_t n;
+  for ( n= 0; n < sf->Nres; ++n )
+    printf ( " %u) type:%d  offset:%ld  size:%lu\n",
+             n, sf->resources[n].type, sf->resources[n].offset,
+             sf->resources[n].size );
+  if ( sf->frontispiece < sf->Nres )
+    printf ( "Frontispiece: %u\n", sf->frontispiece );
+  if ( sf->raw_metadata != NULL )
+    printf ( "Metadata: %s\n", sf->raw_metadata );
   story_file_free ( sf );
   
   free_opts ( &opts );
