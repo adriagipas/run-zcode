@@ -225,8 +225,8 @@ iff_free (
           )
 {
 
-  if ( iff->chunks != NULL ) free ( iff->chunks );
-  free ( iff );
+  if ( iff->chunks != NULL ) g_free ( iff->chunks );
+  g_free ( iff );
   
 } // end iff_free
 

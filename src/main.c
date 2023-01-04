@@ -138,6 +138,7 @@ free_opts (
 /* PROGRAMA PRINCIPAL */
 /**********************/
 
+#include "core/state.h"
 #include "core/story_file.h"
 
 int main ( int argc, char *argv[] )
@@ -157,6 +158,7 @@ int main ( int argc, char *argv[] )
 
   char *err= NULL;
   StoryFile *sf;
+  State *state;
   sf= story_file_new_from_file_name ( args.zcode_fn, &err );
   if ( sf == NULL )
     {
@@ -174,6 +176,22 @@ int main ( int argc, char *argv[] )
     printf ( "Frontispiece: %u\n", sf->frontispiece );
   if ( sf->raw_metadata != NULL )
     printf ( "Metadata: %s\n", sf->raw_metadata );
+  state= state_new ( sf, &err );
+  if ( state == NULL )
+    {
+      fprintf ( stderr, "Error: %s\n", err );
+      free ( err );
+      exit ( EXIT_FAILURE );
+    }
+  printf("\n");
+  printf("DYN_MEM_SIZE: %u\n",state->mem_size);
+  printf("VERSION: %d\n",state->mem[0]);
+  printf("PC: %X\n",state->PC);
+  printf("FRAME: %X\n",state->frame);
+  printf("SP: %X\n",state->SP);
+  printf("STACK:\n");
+  state_print_stack ( state, stdout );
+  state_free ( state );
   story_file_free ( sf );
   
   free_opts ( &opts );

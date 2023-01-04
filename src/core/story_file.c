@@ -597,17 +597,17 @@ story_file_free (
   uint32_t n;
 
 
-  if ( sf->raw_metadata != NULL ) free ( sf->raw_metadata );
+  if ( sf->raw_metadata != NULL ) g_free ( sf->raw_metadata );
   if ( sf->fres != NULL ) fclose ( sf->fres );
-  if ( sf->data != NULL ) free ( sf->data );
+  if ( sf->data != NULL ) g_free ( sf->data );
   if ( sf->resources != NULL )
     {
       for ( n= 0; n < sf->Nres; ++n )
         if ( sf->resources[n].desc != NULL )
-          free ( sf->resources[n].desc );
-      free ( sf->resources );
+          g_free ( sf->resources[n].desc );
+      g_free ( sf->resources );
     }
-  free ( sf );
+  g_free ( sf );
   
 } // end story_file_free
 
