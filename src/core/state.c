@@ -213,6 +213,179 @@ call_main (
 } // end call_main
 
 
+static uint32_t
+calc_quetzal_cmem_size (
+                        const State *state
+                        )
+{
+  
+  uint32_t ret,n;
+  uint8_t val;
+  bool is_zero;
+  int zeros;
+  
+
+  ret= 0;
+  is_zero= false;
+  zeros= 0;
+  for ( n= 0; n < state->mem_size; ++n )
+    {
+      val= state->mem[n]^state->sf->data[n];
+      if ( val != 0x00 )
+        {
+          is_zero= false;
+          ++ret;
+        }
+      else if ( !is_zero )
+        {
+          ret+= 2;
+          zeros= 0;
+          is_zero= true;
+        }
+      else if ( ++zeros == 256 )
+        {
+          ret+= 2;
+          zeros= 0;
+        }
+    }
+  
+  return ret;
+  
+} // end calc_quetzal_cmem_size
+
+
+// Return compressed data
+static uint8_t *
+get_quetzal_cmem (
+                  const State    *state,
+                  const uint32_t  cmem_size
+                  )
+{
+
+  uint32_t n,p;
+  uint8_t val;
+  bool is_zero;
+  int zeros;
+  uint8_t *ret;
+
+
+  ret= g_new ( uint8_t, cmem_size );
+  is_zero= false;
+  zeros= 0;
+  p= 0;
+  for ( n= 0; n < state->mem_size; ++n )
+    {
+      val= state->mem[n]^state->sf->data[n];
+      if ( val != 0x00 )
+        {
+          if ( is_zero ) ret[p++]= (uint8_t) zeros;
+          ret[p++]= val;
+          is_zero= false;
+        }
+      else if ( !is_zero )
+        {
+          ret[p++]= 0x00;
+          zeros= 0;
+          is_zero= true;
+        }
+      else if ( ++zeros == 256 )
+        {
+          ret[p++]= 0xff;
+          ret[p++]= 0x00;
+          zeros= 0;
+        }
+    }
+  if ( is_zero ) ret[p++]= (uint8_t) zeros;
+  
+  assert ( p == cmem_size );
+  
+  return ret;
+  
+} // end get_quetzal_cmem
+
+
+static uint8_t *
+get_quetzal_stks (
+                  const State *state
+                  )
+{
+
+  uint8_t *ret;
+  uint16_t current,frame,val,num_local_vars,i;
+  uint32_t pos;
+  
+
+  // Com a mínim estarà el dumb frame.
+  assert ( state->SP > 0 );
+  assert ( state->SP > state->frame );
+
+  // Crea
+  ret= g_new ( uint8_t, ((uint32_t) state->SP)*2 );
+  current= state->SP-1;
+  frame= state->frame;
+  while ( current != 0xFFFF )
+    {
+      
+      pos= ((uint32_t) frame)*2;
+      
+      // return PC High
+      val= state->stack[frame+1];
+      ret[pos++]= (uint8_t) (val>>8);
+      ret[pos++]= (uint8_t) val;
+      // return PC low | 000pvvvv flags
+      val= state->stack[frame+2];
+      ret[pos++]= (uint8_t) (val>>8);
+      ret[pos++]= (uint8_t) val;
+      // Result | arguments
+      val= state->stack[frame+3];
+      ret[pos++]= (uint8_t) (val>>8);
+      ret[pos++]= (uint8_t) val;
+      // Number of words
+      num_local_vars= state->stack[frame+2]&0xF;
+      val= current-(frame+4+num_local_vars)+1;
+      ret[pos++]= (uint8_t) (val>>8);
+      ret[pos++]= (uint8_t) val;
+      // Local variables and values
+      for ( i= frame+4; i <= current; ++i )
+        {
+          val= state->stack[i];
+          ret[pos++]= (uint8_t) (val>>8);
+          ret[pos++]= (uint8_t) val;
+        }
+      
+      current= frame-1;
+      frame= state->stack[frame];
+
+    }
+  
+  return ret;
+  
+} // end get_quetzal_stks
+
+
+static bool
+fwrite_u32_be (
+               FILE           *f,
+               const uint32_t  val
+               )
+{
+
+  uint8_t buf[4];
+
+
+  buf[0]= (uint8_t) (val>>24);
+  buf[1]= (uint8_t) (val>>16);
+  buf[2]= (uint8_t) (val>>8);
+  buf[3]= (uint8_t) val;
+  
+  if ( fwrite ( buf, sizeof(buf), 1, f ) != 1 )
+    return false;
+
+  return true;
+  
+} // end fwrite_u32_be
+
+
 
 
 /**********************/
@@ -439,3 +612,94 @@ state_print_stack (
     }
   
 } // end state_print_stack
+
+
+bool
+state_save (
+            State       *state,
+            const char  *file_name,
+            char       **err
+            )
+{
+
+  const uint8_t ZERO_VAL= 0x00;
+  
+  FILE *f;
+  uint8_t buf_PC[3];
+  uint8_t *cmem,*stks;
+  uint32_t cmem_size,ifhd_size,stks_size,total_size;
+  size_t welems;
+  
+  
+  // Obri fitxer.
+  f= fopen ( file_name, "wb" );
+  if ( f == NULL )
+    {
+      error_create_file ( err, file_name );
+      goto error;
+    }
+
+  // Calcula grandàries seccions.
+  ifhd_size= 13;
+  cmem_size= calc_quetzal_cmem_size ( state );
+  stks_size= ((uint32_t) (state->SP))*2;
+  total_size=
+    4 + // FORM TYPE
+    8 + ifhd_size + 1 +
+    8 + cmem_size + ((cmem_size&0x1) ? 1 : 0) +
+    8 + stks_size + ((stks_size&0x1) ? 1 : 0)
+    ;
+
+  // Escriu capçalera
+  if ( fprintf ( f, "FORM" ) != 4 ) goto error_write;
+  if ( !fwrite_u32_be ( f, total_size ) ) goto error_write;
+  if ( fprintf ( f, "IFZS" ) != 4 ) goto error_write;
+
+  // IFhd (Associated story file recognition)
+  if ( fprintf ( f, "IFhd" ) != 4 ) goto error_write;
+  if ( !fwrite_u32_be ( f, 13 ) ) goto error_write;
+  // --> release number 
+  if ( fwrite ( &(state->sf->data[0x2]), 2, 1, f ) != 1 ) goto error_write;
+  // --> serial number
+  if ( fwrite ( &(state->sf->data[0x12]), 6, 1, f ) != 1 ) goto error_write;
+  // --> checksum
+  if ( fwrite ( &(state->sf->data[0x1c]), 2, 1, f ) != 1 ) goto error_write;
+  // --> PC
+  buf_PC[0]= (uint8_t) (state->PC>>16);
+  buf_PC[1]= (uint8_t) (state->PC>>8);
+  buf_PC[2]= (uint8_t) (state->PC);
+  if ( fwrite ( buf_PC, sizeof(buf_PC), 1, f ) != 1 ) goto error_write;
+  if ( fwrite ( &ZERO_VAL, 1, 1, f ) != 1 ) goto error_write;
+
+  // Content of dynamic memory
+  if ( fprintf ( f, "CMem" ) != 4 ) goto error_write;
+  if ( !fwrite_u32_be ( f, cmem_size ) ) goto error_write;
+  cmem= get_quetzal_cmem ( state, cmem_size );
+  welems= fwrite ( cmem, cmem_size, 1, f );
+  g_free ( cmem );
+  if ( welems != 1 ) goto error_write;
+  if ( cmem_size&0x1 )
+    { if ( fwrite ( &ZERO_VAL, 1, 1, f ) != 1 ) goto error_write; }
+  
+  // Content of stacks
+  if ( fprintf ( f, "Stks" ) != 4 ) goto error_write;
+  if ( !fwrite_u32_be ( f, stks_size ) ) goto error_write;
+  stks= get_quetzal_stks ( state );
+  welems= fwrite ( stks, stks_size, 1, f );
+  g_free ( stks );
+  if ( welems != 1 ) goto error_write;
+  if ( stks_size&0x1 )
+    { if ( fwrite ( &ZERO_VAL, 1, 1, f ) != 1 ) goto error_write; }
+  
+  // Tanca
+  fclose ( f );
+
+  return true;
+
+ error_write:
+  error_write_file ( err, file_name );
+ error:
+  if ( f != NULL ) fclose ( f );
+  return false;
+  
+} // end state_save

@@ -191,6 +191,12 @@ int main ( int argc, char *argv[] )
   printf("SP: %X\n",state->SP);
   printf("STACK:\n");
   state_print_stack ( state, stdout );
+  if ( !state_save ( state, "/tmp/prova.sav", &err ) )
+    {
+      fprintf ( stderr, "Error: %s\n", err );
+      free ( err );
+      exit ( EXIT_FAILURE );
+    }
   state_free ( state );
   story_file_free ( sf );
   

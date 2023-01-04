@@ -43,10 +43,16 @@ error_file_ (
              const char  *file_name
              );
 
+#define error_create_file(ERR,FILE_NAME)                        \
+  error_file_ ( (ERR), "Failed to create file", (FILE_NAME) )
+
 #define error_open_file(ERR,FILE_NAME)                          \
   error_file_ ( (ERR), "Failed to open file", (FILE_NAME) )
 
 #define error_read_file(ERR,FILE_NAME)                          \
   error_file_ ( (ERR), "Failed to read from file", (FILE_NAME) )
+
+#define error_write_file(ERR,FILE_NAME)                                 \
+  error_file_ ( (ERR), "Failed to write into file", (FILE_NAME) )
 
 #endif // __UTILS__ERROR_H__

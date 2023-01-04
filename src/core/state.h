@@ -134,4 +134,12 @@ state_print_stack (
                    FILE  *f
                    );
 
+// Desa l'estat en format Quetzal.
+bool
+state_save (
+            State       *state,
+            const char  *file_name,
+            char       **err
+            );
+
 #endif // __CORE__STATE_H__
