@@ -37,6 +37,7 @@ typedef struct
 
 typedef struct
 {
+  char      type[5];
   IFFChunk *chunks;
   size_t    N;
 } IFF;

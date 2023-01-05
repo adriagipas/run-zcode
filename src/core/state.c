@@ -30,6 +30,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "iff.h"
 #include "state.h"
 #include "utils/error.h"
 #include "utils/log.h"
@@ -89,7 +90,7 @@ reset_header_values (
   // el 0x10)
   // 0: Set when transcripting is on
   if ( init ) state->mem[0x10]&= ~0x01;
-  else ww ( "Flags2.0: Set when transcripting is on on reset");
+  else ww ( "Flags2.0: Set when transcripting is on reset");
   // En la resta de flags que es poden canviar en Int o Reset si es
   // permet no cal fer res.
 
@@ -386,6 +387,282 @@ fwrite_u32_be (
 } // end fwrite_u32_be
 
 
+static bool
+find_quetzal_chunks (
+                     const IFF   *iff,
+                     IFFChunk    *ifhd,
+                     IFFChunk    *cmem,
+                     IFFChunk    *stks,
+                     const char  *file_name,
+                     char       **err
+                     )
+{
+
+  size_t n;
+
+
+  // Cerca
+  ifhd->type[0]= '\0';
+  cmem->type[0]= '\0';
+  stks->type[0]= '\0';
+  for ( n= 0; n < iff->N; ++n )
+    if ( strcmp ( iff->chunks[n].type, "IFhd" ) == 0 )
+      *ifhd= iff->chunks[n];
+    else if ( strcmp ( iff->chunks[n].type, "CMem" ) == 0 )
+      *cmem= iff->chunks[n];
+    else if ( strcmp ( iff->chunks[n].type, "Stks" ) == 0 )
+      *stks= iff->chunks[n];
+
+  // Comprova
+  if ( ifhd->type[0] == '\0' )
+    {
+      msgerror ( err, "Chunk IFhd not found" );
+      return false;
+    }
+  if ( cmem->type[0] == '\0' )
+    {
+      msgerror ( err, "Chunk CMem not found" );
+      return false;
+    }
+  if ( stks->type[0] == '\0' )
+    {
+      msgerror ( err, "Chunk Stks not found" );
+      return false;
+    }
+
+  return true;
+  
+} // end find_quetzal_chunks
+
+
+static bool
+load_quetzal_ifhd (
+                   FILE            *f,
+                   State           *state,
+                   const IFFChunk  *chunk,
+                   const char      *file_name,
+                   char           **err
+                   )
+{
+
+  uint8_t *data;
+
+
+  // Obté dades
+  if ( fseek ( f, chunk->offset+8, SEEK_SET ) != 0 )
+    { error_read_file ( err, file_name ); goto error; }
+  data= g_new ( uint8_t, chunk->length );
+  if ( fread ( data, chunk->length, 1, f ) != 1 )
+    { error_read_file ( err, file_name ); goto error; }
+  
+  // Comprova camps.
+  if ( state->mem[0x2] != data[0] || state->mem[0x3] != data[1] )
+    {
+      msgerror ( err,
+                 "Failed to load state, release number mismatch "
+                 "%02X%02X != %02x%02X: %s",
+                 state->mem[0x2], state->mem[0x3],
+                 data[0], data[1], file_name );
+      goto error;
+    }
+  if ( state->mem[0x12] != data[2] ||
+       state->mem[0x13] != data[3] ||
+       state->mem[0x14] != data[4] ||
+       state->mem[0x15] != data[5] ||
+       state->mem[0x16] != data[6] ||
+       state->mem[0x17] != data[7] )
+    {
+      msgerror ( err,
+                 "Failed to load state, serial number mismatch "
+                 "%02X%02X%02X%02X%02X%02X != %02X%02X%02X%02X%02X%02X: %s",
+                 state->mem[0x12], state->mem[0x13], state->mem[0x14],
+                 state->mem[0x15], state->mem[0x16], state->mem[0x17],
+                 data[2], data[3], data[4], data[5], data[6], data[7],
+                 file_name );
+      goto error;
+    }
+  if ( state->mem[0] >= 4 ) // Sols comprove checksum en versions superiors.
+    {
+      if ( state->mem[0x1c] != data[8] || state->mem[0x1d] != data[9] )
+        {
+          msgerror ( err,
+                     "Failed to load state, checksum mismatch "
+                     "%02X%02X != %02x%02X: %s",
+                     state->mem[0x1c], state->mem[0x1d],
+                     data[8], data[9], file_name );
+          goto error;
+        }
+    }
+
+  // Carrega PC.
+  state->PC=
+    (((uint32_t) data[10])<<16) |
+    (((uint32_t) data[11])<<8) |
+    ((uint32_t) data[12])
+    ;
+  
+  // Allibera
+  g_free ( data );
+  
+  return true;
+  
+ error:
+  g_free ( data );
+  return false;
+  
+} // end load_quetzal_ifhd
+
+
+static bool
+load_quetzal_cmem (
+                   FILE            *f,
+                   State           *state,
+                   const IFFChunk  *chunk,
+                   const char      *file_name,
+                   char           **err
+                   )
+{
+
+  uint8_t *data;
+  uint8_t flags2_10,flags2_11,val;
+  uint32_t i,pos,num_zeros,j;
+  
+  
+  // Obté dades
+  if ( fseek ( f, chunk->offset+8, SEEK_SET ) != 0 )
+    { error_read_file ( err, file_name ); goto error; }
+  data= g_new ( uint8_t, chunk->length );
+  if ( fread ( data, chunk->length, 1, f ) != 1 )
+    { error_read_file ( err, file_name ); goto error; }
+  
+  // Carrega (S'ha de descomprimir)
+  flags2_10= state->mem[0x10];
+  flags2_11= state->mem[0x11];
+  pos= 0;
+  for ( i= 0; i < chunk->length && pos < state->mem_size; ++i )
+    {
+      val= data[i];
+      if ( val != 0x00 )
+        {
+          state->mem[pos]= state->sf->data[pos]^val;
+          ++pos;
+        }
+      else
+        {
+          state->mem[pos]= state->sf->data[pos];
+          ++pos; ++i;
+          if ( i >= chunk->length ) goto error_invalid_cmem;
+          num_zeros= (uint32_t) data[i];
+          for ( j= 0; j < num_zeros && pos < state->mem_size; ++j )
+            {
+              state->mem[pos]= state->sf->data[pos];
+              ++pos;
+            }
+          if ( j != num_zeros ) goto error_invalid_cmem;
+        }
+    }
+  if ( pos > state->mem_size ) goto error_invalid_cmem;
+  for ( ; pos < state->mem_size; ++pos )
+    state->mem[pos]= state->sf->data[pos];
+  reset_header_values ( state, false );
+  state->mem[0x10]= flags2_10;
+  state->mem[0x11]= flags2_11;
+  
+  // Allibera
+  g_free ( data );
+  
+  return true;
+  
+ error_invalid_cmem:
+  msgerror ( err,
+             "Failed to load state, invalid CMem"
+             " compressed data: %s",
+             file_name );
+ error:
+  g_free ( data );
+  return false;
+  
+} // end load_quetzal_cmem
+
+
+static bool
+load_quetzal_stks (
+                   FILE            *f,
+                   State           *state,
+                   const IFFChunk  *chunk,
+                   const char      *file_name,
+                   char           **err
+                   )
+{
+
+  uint8_t *data;
+  uint8_t tmp;
+  uint32_t i,num_local_vars,num_words_eval,total_extra,j;
+  uint16_t pos;
+  
+  
+  // Obté dades
+  if ( fseek ( f, chunk->offset+8, SEEK_SET ) != 0 )
+    { error_read_file ( err, file_name ); goto error; }
+  data= g_new ( uint8_t, chunk->length );
+  if ( fread ( data, chunk->length, 1, f ) != 1 )
+    { error_read_file ( err, file_name ); goto error; }
+
+  // Processa
+  pos= state->SP= state->frame= 0x0000;
+  i= 0;
+  while ( (pos+3) < 0xFFFF && (i+7) < chunk->length )
+    {
+      // Old frame
+      state->stack[pos++]= state->frame;
+      state->frame= state->SP;
+      // PC_HIGH
+      state->stack[pos++]= (((uint16_t) data[i])<<8) | ((uint16_t) data[i+1]);
+      i+= 2;
+      // PC_LOW | 000pvvvv flags
+      tmp= data[i+1];
+      if ( (tmp&0x1F) != tmp ) goto error_invalid_stks;
+      num_local_vars= (uint32_t) (tmp&0xF);
+      state->stack[pos++]= (((uint16_t) data[i])<<8) | ((uint16_t) tmp);
+      i+= 2;
+      // Variable result | 0gfedcba
+      state->stack[pos++]= (((uint16_t) data[i])<<8) | ((uint16_t) data[i+1]);
+      i+= 2;
+      //  number of words of evaluation
+      num_words_eval= (((uint16_t) data[i])<<8) | ((uint16_t) data[i+1]);
+      i+= 2;
+      total_extra= num_local_vars + num_words_eval;
+      if ( (((uint32_t) pos)+total_extra > 0xFFFF) ||
+           i+total_extra > chunk->length )
+        goto error_invalid_stks;
+      // Local variables i Other
+      for ( j= 0; j < total_extra; ++j )
+        {
+          state->stack[pos++]=
+            (((uint16_t) data[i])<<8) | ((uint16_t) data[i+1]);
+          i+= 2;
+        }
+      // Nou SP
+      state->SP= pos;
+    }
+  if ( i != chunk->length ) goto error_invalid_stks;
+  
+  // Allibera
+  g_free ( data );
+  
+  return true;
+  
+ error_invalid_stks:
+  msgerror ( err,
+             "Failed to load state, invalid Stks data or stack too large: %s",
+             file_name );
+ error:
+  g_free ( data );
+  return false;
+  
+} // end load_quetzal_stks
+
+
 
 
 /**********************/
@@ -570,7 +847,7 @@ state_stack_pop (
                   )
 {
 
-  if ( state->SP == 0x0000 )
+  if ( state->SP == state->frame+4 )
     {
       msgerror ( err, "Stack underflow" );
       return false;
@@ -703,3 +980,64 @@ state_save (
   return false;
   
 } // end state_save
+
+
+bool
+state_load (
+            State       *state,
+            const char  *file_name,
+            char       **err
+            )
+{
+
+  FILE *f;
+  IFF *iff;
+  IFFChunk ifhd,cmem,stks;
+  
+
+  // Prepara.
+  f= NULL;
+  iff= NULL;
+
+  // Obté el IFF
+  iff= iff_new_from_file_name ( file_name, err );
+  if ( iff == NULL ) goto error;
+  if ( strcmp ( iff->type, "IFZS" ) != 0 )
+    {
+      msgerror ( err, "Unknown FORM type '%s': %s",
+                 iff->type, file_name );
+      goto error;
+    }
+
+  // Localitza chunks rellevants.
+  if ( !find_quetzal_chunks ( iff, &ifhd, &cmem, &stks, file_name, err ) )
+    goto error;
+
+  // Obri fitxer
+  f= fopen ( file_name, "rb" );
+  if ( f == NULL ) { error_open_file ( err, file_name ); goto error; }
+
+  // Informació IFhd
+  if ( !load_quetzal_ifhd ( f, state, &ifhd, file_name, err ) )
+    goto error;
+  
+  // Informació CMem
+  if ( !load_quetzal_cmem ( f, state, &cmem, file_name, err ) )
+    goto error;
+
+  // Informació Stks
+  if ( !load_quetzal_stks ( f, state, &stks, file_name, err ) )
+    goto error;
+  
+  // Allibera.
+  iff_free ( iff );
+  fclose ( f );
+  
+  return true;
+
+ error:
+  if ( iff != NULL ) iff_free ( iff );
+  if ( f != NULL ) fclose ( f );
+  return false;
+  
+} // end state_load

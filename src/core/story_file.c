@@ -556,6 +556,12 @@ new_from_blorb (
   iff= iff_new_from_file_name ( file_name, err );
   if ( iff == NULL )
     goto error;
+  if ( strcmp ( iff->type, "IFRS" ) != 0 )
+    {
+      msgerror ( err, "Unknown FORM type '%s': %s",
+                 iff->type, file_name );
+      goto error;
+    }
 
   // Inicialitza resources
   if ( !init_resources ( ret, iff, file_name, err ) )

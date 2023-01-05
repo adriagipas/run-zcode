@@ -56,6 +56,7 @@
 // Llig la capçalera i comprova que tot és correcte.
 static bool
 read_header (
+             IFF         *iff,
              FILE        *f,
              const char  *file_name,
              const long   file_size,
@@ -95,17 +96,12 @@ read_header (
     }
 
   // Form TYPE
-  if ( fread ( buf, sizeof(buf), 1, f ) != 1 )
+  if ( fread ( iff->type, 4, 1, f ) != 1 )
     {
       msgerror ( err, "Unable to read IFF FORM type: %s", file_name );
       return false;
     }
-  if ( strncmp ( buf, "IFRS", 4 ) != 0 )
-    {
-      msgerror ( err, "Unknown FORM type '%c%c%c%c': %s",
-                 buf[0], buf[1], buf[2], buf[3], file_name );
-      return false;
-    }
+  iff->type[4]= '\0';
   
   return true;
   
@@ -262,9 +258,9 @@ iff_new_from_file_name (
   rewind ( f );
 
   // Capçalera
-  if ( !read_header ( f, file_name, fsize, err ) )
+  if ( !read_header ( ret, f, file_name, fsize, err ) )
     goto error;
-
+  
   // Llig chunks
   while ( (err_read= read_next_chunk ( ret, &chunks_size, f,
                                        file_name, fsize, err )) == 1 );

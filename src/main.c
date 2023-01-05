@@ -197,6 +197,20 @@ int main ( int argc, char *argv[] )
       free ( err );
       exit ( EXIT_FAILURE );
     }
+  if ( !state_load ( state, "/tmp/prova.sav", &err ) )
+    {
+      fprintf ( stderr, "Error: %s\n", err );
+      free ( err );
+      exit ( EXIT_FAILURE );
+    }
+  printf("\n");
+  printf("DYN_MEM_SIZE: %u\n",state->mem_size);
+  printf("VERSION: %d\n",state->mem[0]);
+  printf("PC: %X\n",state->PC);
+  printf("FRAME: %X\n",state->frame);
+  printf("SP: %X\n",state->SP);
+  printf("STACK:\n");
+  state_print_stack ( state, stdout );
   state_free ( state );
   story_file_free ( sf );
   

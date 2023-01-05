@@ -142,4 +142,12 @@ state_save (
             char       **err
             );
 
+// Llegit l'estat en format Quetzal.
+bool
+state_load (
+            State       *state,
+            const char  *file_name,
+            char       **err
+            );
+
 #endif // __CORE__STATE_H__
