@@ -1,6 +1,8 @@
 CORE= static_library('core',
                      'iff.h',
                      'iff.c',
+                     'interpreter.h',
+                     'interpreter.c',
                      'state.h',
                      'state.c',
                      'story_file.h',

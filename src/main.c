@@ -29,6 +29,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "core/interpreter.h"
+
 
 
 
@@ -138,9 +140,6 @@ free_opts (
 /* PROGRAMA PRINCIPAL */
 /**********************/
 
-#include "core/state.h"
-#include "core/story_file.h"
-
 int main ( int argc, char *argv[] )
 {
 
@@ -157,62 +156,15 @@ int main ( int argc, char *argv[] )
   printf ( "VERBOSE: %d\n", opts.verbose );
 
   char *err= NULL;
-  StoryFile *sf;
-  State *state;
-  sf= story_file_new_from_file_name ( args.zcode_fn, &err );
-  if ( sf == NULL )
+  Interpreter *intp;
+  intp= interpreter_new_from_file_name ( args.zcode_fn, &err );
+  if ( intp == NULL )
     {
       fprintf ( stderr, "Error: %s\n", err );
       free ( err );
       exit ( EXIT_FAILURE );
     }
-  printf ( "SF size: %lu\n", sf->size );
-  uint32_t n;
-  for ( n= 0; n < sf->Nres; ++n )
-    printf ( " %u) type:%d  offset:%ld  size:%lu\n",
-             n, sf->resources[n].type, sf->resources[n].offset,
-             sf->resources[n].size );
-  if ( sf->frontispiece < sf->Nres )
-    printf ( "Frontispiece: %u\n", sf->frontispiece );
-  if ( sf->raw_metadata != NULL )
-    printf ( "Metadata: %s\n", sf->raw_metadata );
-  state= state_new ( sf, &err );
-  if ( state == NULL )
-    {
-      fprintf ( stderr, "Error: %s\n", err );
-      free ( err );
-      exit ( EXIT_FAILURE );
-    }
-  printf("\n");
-  printf("DYN_MEM_SIZE: %u\n",state->mem_size);
-  printf("VERSION: %d\n",state->mem[0]);
-  printf("PC: %X\n",state->PC);
-  printf("FRAME: %X\n",state->frame);
-  printf("SP: %X\n",state->SP);
-  printf("STACK:\n");
-  state_print_stack ( state, stdout );
-  if ( !state_save ( state, "/tmp/prova.sav", &err ) )
-    {
-      fprintf ( stderr, "Error: %s\n", err );
-      free ( err );
-      exit ( EXIT_FAILURE );
-    }
-  if ( !state_load ( state, "/tmp/prova.sav", &err ) )
-    {
-      fprintf ( stderr, "Error: %s\n", err );
-      free ( err );
-      exit ( EXIT_FAILURE );
-    }
-  printf("\n");
-  printf("DYN_MEM_SIZE: %u\n",state->mem_size);
-  printf("VERSION: %d\n",state->mem[0]);
-  printf("PC: %X\n",state->PC);
-  printf("FRAME: %X\n",state->frame);
-  printf("SP: %X\n",state->SP);
-  printf("STACK:\n");
-  state_print_stack ( state, stdout );
-  state_free ( state );
-  story_file_free ( sf );
+  interpreter_free ( intp );
   
   free_opts ( &opts );
   
