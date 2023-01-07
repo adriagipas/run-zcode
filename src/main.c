@@ -141,6 +141,8 @@ free_opts (
 /* PROGRAMA PRINCIPAL */
 /**********************/
 
+#include "debug/tracer.h"
+
 int main ( int argc, char *argv[] )
 {
   
@@ -154,19 +156,27 @@ int main ( int argc, char *argv[] )
 
   usage ( &argc, &argv, &args, &opts );
   err= NULL;
-  intp= interpreter_new_from_file_name ( args.zcode_fn, &err );
-  if ( intp == NULL ) ee ( err );
   if ( opts.debug )
     {
-      fprintf ( stderr, "FALTA DEBUG!!!\n" );
-      exit ( EXIT_FAILURE );
+      DebugTracer *tracer;
+      tracer= debug_tracer_new ( DEBUG_TRACER_FLAGS_CPU |
+                                 DEBUG_TRACER_FLAGS_MEM );
+      intp= interpreter_new_from_file_name
+        ( args.zcode_fn, TRACER(tracer), &err );
+      if ( intp == NULL ) ee ( err );
+      if ( !interpreter_trace ( intp, 3, &err ) )
+        ee ( err );
+      interpreter_free ( intp );
+      debug_tracer_free ( tracer );
     }
   else
     {
+      intp= interpreter_new_from_file_name ( args.zcode_fn, NULL, &err );
+      if ( intp == NULL ) ee ( err );
       if ( !interpreter_run ( intp, &err ) )
         ee ( err );
+      interpreter_free ( intp );
     }
-  interpreter_free ( intp );
   free_opts ( &opts );
   
   return EXIT_SUCCESS;

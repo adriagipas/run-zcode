@@ -90,6 +90,27 @@ read_byte (
 } // end read_byte
 
 
+static bool
+read_byte_trace (
+                 const MemoryMap *mem,
+                 const uint32_t   addr,
+                 uint8_t         *val,
+                 const bool       high_mem_allowed,
+                 char           **err
+                 )
+{
+
+  if ( !read_byte ( mem, addr, val, high_mem_allowed, err ) )
+    return false;
+  if ( mem->tracer != NULL && mem->tracer->mem_access != NULL )
+    mem->tracer->mem_access
+      ( mem->tracer, addr, (uint16_t) *val, MEM_ACCESS_READB );
+
+  return true;
+  
+} // end read_byte_trace
+
+
 // NOTA!!! No sé si les adreces han d'estar aliniades (assumire que
 // igual no) i que ocorre si una paraula està a mitat camí entre dos
 // seccions (assumisc diverses coses).
@@ -138,6 +159,27 @@ read_word (
   return true;
   
 } // end read_word
+
+
+static bool
+read_word_trace (
+                 const MemoryMap *mem,
+                 const uint32_t   addr,
+                 uint16_t        *val,
+                 const bool       high_mem_allowed,
+                 char           **err
+                 )
+{
+
+  if ( !read_word ( mem, addr, val, high_mem_allowed, err ) )
+    return false;
+  if ( mem->tracer != NULL && mem->tracer->mem_access != NULL )
+    mem->tracer->mem_access
+      ( mem->tracer, addr, *val, MEM_ACCESS_READW );
+  
+  return true;
+  
+} // end read_word_trace
 
 
 static bool
@@ -190,6 +232,27 @@ write_byte (
   return true;
   
 } // end write_byte
+
+
+static bool
+write_byte_trace (
+                  const MemoryMap *mem,
+                  const uint32_t   addr,
+                  const uint8_t    val,
+                  const bool       high_mem_allowed,
+                  char           **err
+                  )
+{
+
+  if ( !write_byte ( mem, addr, val, high_mem_allowed, err ) )
+    return false;
+  if ( mem->tracer != NULL && mem->tracer->mem_access != NULL )
+    mem->tracer->mem_access
+      ( mem->tracer, addr, (uint16_t) val, MEM_ACCESS_WRITEB );
+
+  return true;
+  
+} // end write_byte_trace
 
 
 static bool
@@ -248,6 +311,103 @@ write_word (
 } // end write_word
 
 
+static bool
+write_word_trace (
+                  const MemoryMap  *mem,
+                  const uint32_t    addr,
+                  const uint16_t    val,
+                  const bool        high_mem_allowed,
+                  char            **err
+                  )
+{
+
+  if ( !write_word ( mem, addr, val, high_mem_allowed, err ) )
+    return false;
+  if ( mem->tracer != NULL && mem->tracer->mem_access != NULL )
+    mem->tracer->mem_access
+      ( mem->tracer, addr, val, MEM_ACCESS_WRITEW );
+
+  return true;
+  
+} // end write_word_trace
+
+
+static uint16_t
+readvar (
+         const MemoryMap *mem,
+         const int        ind
+         )
+{
+  
+  uint32_t offset;
+  uint16_t ret;
+  
+  
+  offset= mem->global_var_offset + ind;
+  ret=
+    (((uint16_t) mem->dyn_mem[offset])<<8) |
+    ((uint16_t) mem->dyn_mem[offset+1])
+    ;
+  
+  return ret;
+  
+} // end readvar
+
+
+static uint16_t
+readvar_trace (
+               const MemoryMap *mem,
+               const int        ind
+               )
+{
+  
+  uint16_t ret;
+
+
+  ret= readvar ( mem, ind );
+  if ( mem->tracer != NULL && mem->tracer->mem_access != NULL )
+    mem->tracer->mem_access
+      ( mem->tracer, (uint16_t) ind, ret, MEM_ACCESS_READVAR );
+
+  return ret;
+  
+} // end readvar_trace
+
+
+static void
+writevar (
+          MemoryMap      *mem,
+          const int       ind,
+          const uint16_t  val
+          )
+{
+
+  uint32_t offset;
+  
+
+  offset= mem->global_var_offset + ind;
+  mem->dyn_mem[offset]= (uint8_t) (val>>8);
+  mem->dyn_mem[offset+1]= (uint8_t) val;
+  
+} // end writevar
+
+
+static void
+writevar_trace (
+                MemoryMap      *mem,
+                const int       ind,
+                const uint16_t  val
+                )
+{
+
+  writevar ( mem, ind, val );
+  if ( mem->tracer != NULL && mem->tracer->mem_access != NULL )
+    mem->tracer->mem_access
+      ( mem->tracer, (uint16_t) ind, val, MEM_ACCESS_WRITEVAR );
+  
+} // end writevar_trace
+
+
 
 
 /**********************/
@@ -267,6 +427,7 @@ MemoryMap *
 memory_map_new (
                 const StoryFile  *sf,
                 const State      *state,
+                Tracer           *tracer,
                 char            **err
                 )
 {
@@ -280,6 +441,7 @@ memory_map_new (
   ret->dyn_mem_size= state->mem_size;
   ret->sf_mem= sf->data;
   ret->sf_mem_size= (uint32_t) (sf->size);
+  ret->tracer= tracer;
 
   // High memory mark.
   ret->high_mem_mark=
@@ -302,6 +464,8 @@ memory_map_new (
   ret->readw= read_word;
   ret->writeb= write_byte;
   ret->writew= write_word;
+  ret->readvar= readvar;
+  ret->writevar= writevar;
 
   // Altres.
   ret->global_var_offset=
@@ -328,41 +492,30 @@ memory_map_new (
 } // end memory_map_new
 
 
-uint16_t
-memory_map_readvar (
-                    const MemoryMap *mem,
-                    const int        ind
-                    )
-{
-
-  uint32_t offset;
-  uint16_t ret;
-
-
-  offset= mem->global_var_offset + ind;
-  ret=
-    (((uint16_t) mem->dyn_mem[offset])<<8) |
-    ((uint16_t) mem->dyn_mem[offset+1])
-    ;
-  
-  return ret;
-  
-} // end memory_map_readvar
-
-
 void
-memory_map_writevar (
-                     MemoryMap      *mem,
-                     const int       ind,
-                     const uint16_t  val
-                     )
+memory_map_enable_trace (
+                         MemoryMap  *mem,
+                         const bool  enable
+                         )
 {
 
-  uint32_t offset;
+  if ( enable )
+    {
+      mem->readb= read_byte_trace;
+      mem->readw= read_word_trace;
+      mem->writeb= write_byte_trace;
+      mem->writew= write_word_trace;
+      mem->readvar= readvar_trace;
+      mem->writevar= writevar_trace;
+    }
+  else
+    {
+      mem->readb= read_byte;
+      mem->readw= read_word;
+      mem->writeb= write_byte;
+      mem->writew= write_word;
+      mem->readvar= readvar;
+      mem->writevar= writevar;
+    }
   
-
-  offset= mem->global_var_offset + ind;
-  mem->dyn_mem[offset]= (uint8_t) (val>>8);
-  mem->dyn_mem[offset+1]= (uint8_t) val;
-  
-} // end memory_map_writevar
+} // end memory_map_enable_trace

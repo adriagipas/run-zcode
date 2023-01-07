@@ -29,18 +29,22 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "disassembler.h"
 #include "memory_map.h"
 #include "state.h"
 #include "story_file.h"
+#include "tracer.h"
 
 typedef struct
 {
 
   // TOT ÉS PRIVAT ///
-  StoryFile *sf;
-  State     *state;
-  MemoryMap *mem;
-
+  StoryFile    *sf;
+  State        *state;
+  MemoryMap    *mem;
+  Instruction  *ins;
+  Tracer       *tracer; // Pot ser NULL.
+  
   // Altres
   uint8_t version;
   uint32_t routine_offset;
@@ -56,6 +60,7 @@ interpreter_free (
 Interpreter *
 interpreter_new_from_file_name (
                                 const char  *file_name,
+                                Tracer      *tracer, // Pot ser NULL
                                 char       **err
                                 );
 
@@ -65,5 +70,12 @@ interpreter_run (
                  Interpreter  *intp,
                  char        **err
                  );
+
+bool
+interpreter_trace (
+                   Interpreter          *intp,
+                   const unsigned long   iters,
+                   char                **err
+                   );
 
 #endif // __CORE__INTERPRETER_H__

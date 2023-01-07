@@ -1,6 +1,9 @@
 CORE= static_library('core',
+                     'disassembler.h',
+                     'disassembler.c',
                      'iff.h',
                      'iff.c',
+                     'instruction.h',
                      'interpreter.h',
                      'interpreter.c',
                      'memory_map.h',
@@ -9,6 +12,7 @@ CORE= static_library('core',
                      'state.c',
                      'story_file.h',
                      'story_file.c',
+                     'tracer.h',
                      include_directories: [ROOT_H],
                      dependencies : [GLIB2])
                      

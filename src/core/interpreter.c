@@ -31,6 +31,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "disassembler.h"
 #include "interpreter.h"
 #include "utils/error.h"
 #include "utils/log.h"
@@ -304,6 +305,27 @@ read_var_ops (
 } // end read_var_ops
 
 
+static bool
+read_var_ops_store (
+                    Interpreter  *intp,
+                    operand_t    *ops,
+                    int          *nops,
+                    uint8_t      *store_var,
+                    char        **err
+                    )
+{
+
+  if ( !read_var_ops ( intp, ops, nops, err ) )
+    return false;
+  if ( !memory_map_READB ( intp->mem, intp->state->PC++,
+                           store_var, true, err ) )
+    return false;
+
+  return true;
+  
+} // end read_var_ops_store
+
+
 static int
 exec_next_inst (
                 Interpreter  *intp,
@@ -324,19 +346,18 @@ exec_next_inst (
     {
       
     case 0xe0: // call_vs
-      if ( !read_var_ops ( intp, ops, &nops, err ) ) return RET_ERROR;
-      if ( !memory_map_READB ( intp->mem, state->PC++,
-                               &result_var, true, err ) )
+      if ( !read_var_ops_store ( intp, ops, &nops, &result_var, err ) )
         return RET_ERROR;
       if ( !call_routine ( intp, ops, nops, result_var, false, err ) )
         return RET_ERROR;
-      return RET_CONTINUE;
       break;
       
     default: // Unknown
       msgerror ( err, "Unknown instruction opcode %02X (%d)", opcode, opcode );
       return RET_ERROR;
     }
+
+  return RET_CONTINUE;
   
 } // end exec_next_inst
 
@@ -353,6 +374,7 @@ interpreter_free (
                   )
 {
 
+  if ( intp->ins != NULL ) instruction_free ( intp->ins );
   if ( intp->mem != NULL ) memory_map_free ( intp->mem );
   if ( intp->sf != NULL ) story_file_free ( intp->sf );
   if ( intp->state != NULL ) state_free ( intp->state );
@@ -364,6 +386,7 @@ interpreter_free (
 Interpreter *
 interpreter_new_from_file_name (
                                 const char  *file_name,
+                                Tracer      *tracer,
                                 char       **err
                                 )
 {
@@ -376,6 +399,8 @@ interpreter_new_from_file_name (
   ret->sf= NULL;
   ret->state= NULL;
   ret->mem= NULL;
+  ret->ins= NULL;
+  ret->tracer= tracer;
 
   // Obri story file
   ret->sf= story_file_new_from_file_name ( file_name, err );
@@ -386,7 +411,7 @@ interpreter_new_from_file_name (
   if ( ret->state == NULL ) goto error;
 
   // Inicialitza mapa de memòria.
-  ret->mem= memory_map_new ( ret->sf, ret->state, err );
+  ret->mem= memory_map_new ( ret->sf, ret->state, tracer, err );
   if ( ret == NULL ) goto error;
 
   // Altres
@@ -429,3 +454,47 @@ interpreter_run (
   return ret==RET_ERROR ? false : true;
   
 } // end interpreter_run
+
+
+bool
+interpreter_trace (
+                   Interpreter          *intp,
+                   const unsigned long   iters,
+                   char                **err
+                   )
+{
+
+  unsigned long i;
+  int ret;
+  
+  
+  // Prepara.
+  if ( intp->ins == NULL )
+    intp->ins= instruction_new ();
+
+  // Itera
+  ret= RET_CONTINUE;
+  memory_map_enable_trace ( intp->mem, false );
+  for ( i= 0; i < iters && ret == RET_CONTINUE; ++i )
+    {
+
+      // Descodifica instrucció
+      if ( intp->tracer != NULL && intp->tracer->exec_inst != NULL )
+        {
+          if ( !instruction_disassemble ( intp->ins, intp->mem,
+                                          intp->state->PC, err ) )
+            return false;
+          intp->tracer->exec_inst ( intp->tracer, intp->ins );
+        }
+
+      // Executa
+      memory_map_enable_trace ( intp->mem, true );
+      ret= exec_next_inst ( intp, err );
+      memory_map_enable_trace ( intp->mem, false );
+      if ( ret == RET_ERROR ) return false;
+      
+    }
+
+  return true;
+  
+} // end interpreter_trace

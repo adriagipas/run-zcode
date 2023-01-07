@@ -25,10 +25,12 @@
 #ifndef __CORE__MEMORY_MAP_H__
 #define __CORE__MEMORY_MAP_H__
 
+#include <stdbool.h>
 #include <stdint.h>
 
 #include "state.h"
 #include "story_file.h"
+#include "tracer.h"
 
 typedef struct _MemoryMap MemoryMap;
 
@@ -43,8 +45,11 @@ struct _MemoryMap
   uint32_t       sf_mem_size;
   uint32_t       high_mem_mark;
 
+  Tracer        *tracer; // Pot ser NULL
+  
   uint8_t        version;
   uint32_t       global_var_offset;
+  
 
   // Callbacks.
   bool (*readb) (const MemoryMap*,const uint32_t,uint8_t*,const bool,char**);
@@ -53,6 +58,8 @@ struct _MemoryMap
                   const uint8_t,const bool,char**);
   bool (*writew) (const MemoryMap*,const uint32_t,
                   const uint16_t,const bool,char**);
+  uint16_t (*readvar) (const MemoryMap *mem,const int ind);
+  void (*writevar) (MemoryMap *mem,const int ind,const uint16_t val);
   
 };
 
@@ -65,6 +72,7 @@ MemoryMap *
 memory_map_new (
                 const StoryFile  *sf,
                 const State      *state,
+                Tracer           *tracer,
                 char            **err
                 );
 
@@ -77,19 +85,16 @@ memory_map_new (
 #define memory_map_WRITEW(MEM,ADDR,VAL,HMEM,ERR)                \
   ((MEM)->writew ( (MEM), (ADDR), (VAL), (HMEM), (ERR) ))
 
-// NOTA!! No comprova res.
-uint16_t
-memory_map_readvar (
-                    const MemoryMap *mem,
-                    const int        ind
-                    );
+// NOTA!! No comprova res
+#define memory_map_readvar(MEM,IND)             \
+  ((MEM)->readvar ( (MEM), (IND) ))
+#define memory_map_writevar(MEM,IND,VAL)        \
+  ((MEM)->writevar ( (MEM), (IND), (VAL) ))
 
-// NOTA!! No comprova res.
 void
-memory_map_writevar (
-                     MemoryMap      *mem,
-                     const int       ind,
-                     const uint16_t  val
-                     );
+memory_map_enable_trace (
+                         MemoryMap  *mem,
+                         const bool  enable
+                         );
 
 #endif // __CORE__MEMORY_MAP_H__
