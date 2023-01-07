@@ -39,4 +39,11 @@ ww (
     ...
     );
 
+// Errors
+void
+ee (
+    const char *format,
+    ...
+    );
+
 #endif // __UTILS__LOG_H__

@@ -30,6 +30,7 @@
 #include <stdlib.h>
 
 #include "core/interpreter.h"
+#include "utils/log.h"
 
 
 
@@ -142,30 +143,30 @@ free_opts (
 
 int main ( int argc, char *argv[] )
 {
-
+  
   struct args args;
   struct opts opts;
+  Interpreter *intp;
+  char *err;
   
   
   setlocale ( LC_ALL, "" );
 
   usage ( &argc, &argv, &args, &opts );
-
-  printf ( "ZCODE: %s\n", args.zcode_fn );
-  printf ( "DEBUG: %d\n", opts.debug );
-  printf ( "VERBOSE: %d\n", opts.verbose );
-
-  char *err= NULL;
-  Interpreter *intp;
+  err= NULL;
   intp= interpreter_new_from_file_name ( args.zcode_fn, &err );
-  if ( intp == NULL )
+  if ( intp == NULL ) ee ( err );
+  if ( opts.debug )
     {
-      fprintf ( stderr, "Error: %s\n", err );
-      free ( err );
+      fprintf ( stderr, "FALTA DEBUG!!!\n" );
       exit ( EXIT_FAILURE );
     }
+  else
+    {
+      if ( !interpreter_run ( intp, &err ) )
+        ee ( err );
+    }
   interpreter_free ( intp );
-  
   free_opts ( &opts );
   
   return EXIT_SUCCESS;

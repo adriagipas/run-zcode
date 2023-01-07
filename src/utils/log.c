@@ -92,3 +92,21 @@ ww (
   va_end ( ap );
   
 } // end ww
+
+
+void
+ee (
+    const char *format,
+    ...
+    )
+{
+
+  va_list ap;
+  
+  
+  va_start ( ap, format );
+  print_msg ( stderr, "[EE] ", format, ap );
+  va_end ( ap );
+  exit ( EXIT_FAILURE );
+  
+} // end ee

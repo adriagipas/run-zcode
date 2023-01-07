@@ -36,7 +36,7 @@
 #define STACK_SIZE 0xFFFF
 
 // IMPORTANT!! Aquests macros no fan comprovacions.
-#define FRAME_NLOCAL(ST) ((ST)->stack[(ST)->frame+2]&0xF)
+#define FRAME_NLOCAL(ST) ((uint8_t) ((ST)->stack[(ST)->frame+2]&0xF))
 #define FRAME_DISCARD_RES(ST) (((ST)->stack[(ST)->frame+2]&0x10)!=0)
 #define FRAME_NUM_RES(ST) ((ST)->stack[(ST)->frame+3]>>8)
 #define FRAME_LOCAL(ST,IND) ((ST)->stack[(ST)->frame+4+(IND)])

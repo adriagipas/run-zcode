@@ -29,6 +29,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "memory_map.h"
 #include "state.h"
 #include "story_file.h"
 
@@ -36,20 +37,14 @@ typedef struct
 {
 
   // TOT ÉS PRIVAT ///
-
   StoryFile *sf;
   State     *state;
+  MemoryMap *mem;
 
-  // Referent a la memòria
-  struct
-  {
-    // NOTA!! Encara que empre U32 enrealitat els possibles valors
-    // (que no vàlids) estan en el rang [0,FFFF]. Per tant, no cal
-    // definit explícitament la marca de la memòria estàtica perquè
-    // l'última adreça vàlida es calcula com
-    // MIN(SF_SIZE-1,FFFF,HIGH_MARK-1)
-    uint32_t high_mem_mark;
-  } mem;
+  // Altres
+  uint8_t version;
+  uint32_t routine_offset;
+  uint32_t static_strings_offset;
   
 } Interpreter;
 
@@ -63,5 +58,12 @@ interpreter_new_from_file_name (
                                 const char  *file_name,
                                 char       **err
                                 );
+
+// Torna cert si tot ha anat bé.
+bool
+interpreter_run (
+                 Interpreter  *intp,
+                 char        **err
+                 );
 
 #endif // __CORE__INTERPRETER_H__
