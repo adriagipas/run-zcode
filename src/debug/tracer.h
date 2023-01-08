@@ -32,8 +32,9 @@
 #include "core/disassembler.h"
 #include "core/tracer.h"
 
-#define DEBUG_TRACER_FLAGS_CPU 0x01
-#define DEBUG_TRACER_FLAGS_MEM 0x02
+#define DEBUG_TRACER_FLAGS_CPU   0x01
+#define DEBUG_TRACER_FLAGS_MEM   0x02
+#define DEBUG_TRACER_FLAGS_STACK 0x04
 
 typedef struct
 {

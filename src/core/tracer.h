@@ -40,6 +40,13 @@ typedef enum
     MEM_ACCESS_READVAR,
     MEM_ACCESS_WRITEVAR
   } MemAccess;
+
+typedef enum
+  {
+    STACK_ACCESS_READ,
+    STACK_ACCESS_WRITE,
+  } StackAccess;
+
 typedef struct _Tracer Tracer;
 
 // Tots els mètodes poden ser NULL.
@@ -49,7 +56,12 @@ typedef struct _Tracer Tracer;
                                                                         \
   /* Es crida cada vegada que s'accedeix a la memòria. */               \
   void (*mem_access) (Tracer *self,const uint32_t addr,                 \
-                      const uint16_t data,const MemAccess type);
+                      const uint16_t data,const MemAccess type);        \
+                                                                          \
+  /* Es crida cada vegada que s'accedeix a la pila. ind==0 és pila*/    \
+  /* altre variable local */                                            \
+  void (*stack_access) (Tracer *self,const uint8_t ind,                 \
+                        const uint16_t data,const StackAccess type);
 
 struct _Tracer
 {

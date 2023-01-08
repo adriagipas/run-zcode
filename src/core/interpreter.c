@@ -127,22 +127,12 @@ read_var (
 
   State *state;
   
-
+  
   state= intp->state;
-  if ( var == 0x00 ) // Pila
+  if ( var <= 0x0f ) // Pila o variables locals
     {
-      if ( !state_stack_pop ( state, val, err ) )
+      if ( !state_readvar ( state, var, val, err ) )
         return false;
-    }
-  else if ( var <= 0x0f ) // Variables locals
-    {
-      if ( var-1 >= FRAME_NLOCAL(state) )
-        {
-          msgerror ( err, "Failed to read local variable: index %u"
-                     " out of bounds [0,%u[", var-1, FRAME_NLOCAL(state) );
-          return false;
-        }
-      *val= FRAME_LOCAL(state,var-1);
     }
   else // Variables globals
     *val= memory_map_readvar ( intp->mem, (int) ((uint32_t) (var-0x10)) );
@@ -247,10 +237,12 @@ call_routine (
     }
 
   // Crea nou frame
-  if ( !state_new_frame ( intp->state, addr, local_vars, num_local_vars,
+  if ( !state_new_frame ( intp->state, addr, num_local_vars,
                           discard_result, result_var, args_mask, err ) )
     return false;
-
+  for ( n= 0; n < num_local_vars; ++n )
+    if ( !state_writevar ( intp->state, n+1, local_vars[n], err ) )
+      return false;
   
   return true;
   
@@ -407,7 +399,7 @@ interpreter_new_from_file_name (
   if ( ret->sf == NULL ) goto error;
 
   // Crea estat.
-  ret->state= state_new ( ret->sf, err );
+  ret->state= state_new ( ret->sf, tracer, err );
   if ( ret->state == NULL ) goto error;
 
   // Inicialitza mapa de memòria.
@@ -489,8 +481,10 @@ interpreter_trace (
 
       // Executa
       memory_map_enable_trace ( intp->mem, true );
+      state_enable_trace ( intp->state, true );
       ret= exec_next_inst ( intp, err );
       memory_map_enable_trace ( intp->mem, false );
+      state_enable_trace ( intp->state, false );
       if ( ret == RET_ERROR ) return false;
       
     }

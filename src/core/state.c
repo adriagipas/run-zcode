@@ -205,9 +205,12 @@ call_main (
   // Prepara entorn i crea un nou frame.
   state->frame= 0x0000;
   state->SP= 0x0000;
-  if ( !state_new_frame ( state, main_addr+1, local_vars, num_local_vars,
+  if ( !state_new_frame ( state, main_addr+1, num_local_vars,
                           true, 0, 0x00, err ) )
     return false;
+  for ( n= 0; n < num_local_vars; ++n )
+    if ( !state_writevar ( state, n+1, local_vars[n], err ) )
+      return false;
   
   return true;
   
@@ -663,6 +666,128 @@ load_quetzal_stks (
 } // end load_quetzal_stks
 
 
+// VAR: 0 pila, resta variables locals.
+static bool
+writevar (
+          State           *state,
+          const uint8_t    var,
+          const uint16_t   val,
+          char           **err
+          )
+{
+
+  uint8_t ind;
+
+  
+  // Pila
+  if ( var == 0x00 )
+    {
+      if ( state->SP == 0xFFFF )
+        {
+          msgerror ( err, "Stack overflow" );
+          return false;
+        }
+      state->stack[state->SP++]= val;
+    }
+
+  // Variable local
+  else
+    {
+      ind= var-1;
+      if ( ind >= FRAME_NLOCAL(state) )
+        {
+          msgerror ( err, "Failed to write local variable: index %u"
+                     " is out of bounds [0,%u[", ind, FRAME_NLOCAL(state) );
+          return false;
+        }
+      FRAME_LOCAL(state,ind)= val;
+    }
+  
+  return true;
+  
+} // end writevar
+
+
+static bool
+writevar_trace (
+                State           *state,
+                const uint8_t    var,
+                const uint16_t   val,
+                char           **err
+                )
+{
+
+  if ( !writevar ( state, var, val, err ) )
+    return false;
+  if ( state->tracer != NULL && state->tracer->stack_access != NULL )
+    state->tracer->stack_access ( state->tracer, var, val, STACK_ACCESS_WRITE );
+  
+  return true;
+  
+} // end writevar_trace
+
+
+// VAR: 0 pila, resta variables locals.
+static bool
+readvar (
+         State          *state,
+         const uint8_t   var,
+         uint16_t       *val,
+         char          **err
+         )
+{
+  
+  uint8_t ind;
+  
+  
+  // Pila
+  if ( var == 0x00 )
+    {
+      if ( state->SP == state->frame+4 )
+        {
+          msgerror ( err, "Stack underflow" );
+          return false;
+        }
+      *val= state->stack[--state->SP];
+    }
+
+  // Variable local
+  else
+    {
+      ind= var-1;
+      if ( ind >= FRAME_NLOCAL(state) )
+        {
+          msgerror ( err, "Failed to read local variable: index %u"
+                     " is out of bounds [0,%u[", ind, FRAME_NLOCAL(state) );
+          return false;
+        }
+      *val= FRAME_LOCAL(state,ind);
+    }
+  
+  return true;
+  
+} // end readvar
+
+
+static bool
+readvar_trace (
+               State          *state,
+               const uint8_t   var,
+               uint16_t       *val,
+               char          **err
+               )
+{
+
+  if ( !readvar ( state, var, val, err ) )
+    return false;
+  if ( state->tracer != NULL && state->tracer->stack_access != NULL )
+    state->tracer->stack_access ( state->tracer, var, *val, STACK_ACCESS_READ );
+  
+  return true;
+  
+} // end readvar_trace
+
+
 
 
 /**********************/
@@ -684,6 +809,7 @@ state_free (
 State *
 state_new (
            StoryFile  *sf,
+           Tracer     *tracer,
            char      **err
            )
 {
@@ -696,6 +822,7 @@ state_new (
   ret= g_new ( State, 1 );
   ret->mem= NULL;
   ret->sf= sf;
+  ret->tracer= tracer;
 
   // Crea memòria dinàmica.
   version= sf->data[0];
@@ -723,6 +850,10 @@ state_new (
         goto error;
     }
   else create_dummy_frame ( ret );
+
+  // Callbacks.
+  ret->writevar= writevar;
+  ret->readvar= readvar;
   
   return ret;
 
@@ -737,7 +868,6 @@ bool
 state_new_frame (
                  State           *state,
                  const uint32_t   new_PC,
-                 const uint16_t  *local_vars,
                  const uint8_t    num_local_vars, // [0,15]
                  const bool       discard_result,
                  const uint8_t    result_num_var,
@@ -747,7 +877,6 @@ state_new_frame (
 {
 
   uint16_t size,new_SP;
-  uint8_t n;
   
 
   assert ( num_local_vars <= 15 );
@@ -783,8 +912,7 @@ state_new_frame (
     ((uint16_t) args_mask)
     ;
   // --> LOCAL_VARS
-  for ( n= 0; n < num_local_vars; ++n )
-    state->stack[state->SP++]= local_vars[n];
+  state->SP+= (uint16_t) num_local_vars;
   assert ( new_SP == state->SP );
 
   // Nou PC
@@ -817,46 +945,6 @@ state_free_frame (
   return true;
   
 } // end state_free_frame
-
-
-bool
-state_stack_push (
-                  State           *state,
-                  const uint16_t   val,
-                  char           **err
-                  )
-{
-
-  if ( state->SP == 0xFFFF )
-    {
-      msgerror ( err, "Stack overflow" );
-      return false;
-    }
-  state->stack[state->SP++]= val;
-
-  return true;
-  
-} // end state_stack_push
-
-
-bool
-state_stack_pop (
-                  State     *state,
-                  uint16_t  *val,
-                  char     **err
-                  )
-{
-
-  if ( state->SP == state->frame+4 )
-    {
-      msgerror ( err, "Stack underflow" );
-      return false;
-    }
-  *val= state->stack[--state->SP];
-  
-  return true;
-  
-} // end state_stack_pop
 
 
 void
@@ -1041,3 +1129,24 @@ state_load (
   return false;
   
 } // end state_load
+
+
+void
+state_enable_trace (
+                    State      *state,
+                    const bool  enable
+                    )
+{
+
+  if ( enable )
+    {
+      state->writevar= writevar_trace;
+      state->readvar= readvar_trace;
+    }
+  else
+    {
+      state->writevar= writevar;
+      state->readvar= readvar;
+    }
+  
+} // end state_enable_trace

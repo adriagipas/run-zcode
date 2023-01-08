@@ -32,6 +32,7 @@
 #include <stdlib.h>
 
 #include "story_file.h"
+#include "tracer.h"
 
 #define STACK_SIZE 0xFFFF
 
@@ -39,7 +40,7 @@
 #define FRAME_NLOCAL(ST) ((uint8_t) ((ST)->stack[(ST)->frame+2]&0xF))
 #define FRAME_DISCARD_RES(ST) (((ST)->stack[(ST)->frame+2]&0x10)!=0)
 #define FRAME_NUM_RES(ST) ((ST)->stack[(ST)->frame+3]>>8)
-#define FRAME_LOCAL(ST,IND) ((ST)->stack[(ST)->frame+4+(IND)])
+#define FRAME_LOCAL(ST,IND) ((ST)->stack[(ST)->frame+4+((uint16_t) (IND))])
 
 /*
  * Cada vegada que es crida a una nova rutina en la pila es crea un
@@ -55,7 +56,9 @@
  *                 ----------------
  *          SP --> |
  */
-typedef struct
+typedef struct _State State;
+
+struct _State
 {
 
   // Camps públics!!
@@ -69,8 +72,13 @@ typedef struct
 
   // Camps privats
   const StoryFile *sf;
+  Tracer          *tracer; // Pot ser NULL
+
+  // Callbacks.
+  bool (*writevar) (State *,const uint8_t,const uint16_t,char **);
+  bool (*readvar) (State *,const uint8_t,uint16_t *,char **);
   
-} State;
+};
 
 void
 state_free (
@@ -80,11 +88,14 @@ state_free (
 State *
 state_new (
            StoryFile  *sf,
+           Tracer     *tracer, // Pot ser NULL
            char      **err
            );
 
 // Torna cert si tot ha anat bé. El nombre de variables locals no pot
 // superar mai 15 i no es comprova.
+//
+// IMPORTANT!! Les variables locals no s'inicialitzen.
 //
 // 'result_num_var' s'ignora si 'discard_result' és true.
 //
@@ -99,7 +110,6 @@ bool
 state_new_frame (
                  State           *state,
                  const uint32_t   new_PC,
-                 const uint16_t  *local_vars,
                  const uint8_t    num_local_vars, // [0,15]
                  const bool       discard_result,
                  const uint8_t    result_num_var,
@@ -114,19 +124,13 @@ state_free_frame (
                   char  **err
                   );
 
-bool
-state_stack_push (
-                  State           *state,
-                  const uint16_t   val,
-                  char           **err
-                  );
+// VAR: 0 pila, resta variables locals.
+#define state_writevar(STATE,VAR,VAL,ERR)               \
+  ((STATE)->writevar ( (STATE), (VAR), (VAL), (ERR) ))
 
-bool
-state_stack_pop (
-                  State     *state,
-                  uint16_t  *val,
-                  char     **err
-                 );
+// VAR: 0 pila, resta variables locals.
+#define state_readvar(STATE,VAR,P_DST,ERR)              \
+  ((STATE)->readvar ( (STATE), (VAR), (P_DST), (ERR) ))
 
 void
 state_print_stack (
@@ -149,5 +153,11 @@ state_load (
             const char  *file_name,
             char       **err
             );
+
+void
+state_enable_trace (
+                    State      *state,
+                    const bool  enable
+                    );
 
 #endif // __CORE__STATE_H__

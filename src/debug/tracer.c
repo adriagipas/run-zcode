@@ -178,6 +178,41 @@ mem_access (
 } // end mem_access
 
 
+static void
+stack_access (
+              Tracer            *self_,
+              const uint8_t      ind,
+              const uint16_t     data,
+              const StackAccess  type
+            )
+{
+
+  DebugTracer *self;
+  
+
+  self= DEBUG_TRACER(self_);
+  if ( (self->flags&DEBUG_TRACER_FLAGS_STACK) == 0  ) return;
+
+  switch ( type )
+    {
+    case STACK_ACCESS_READ:
+      if ( ind == 0 )
+        printf ( "[STK]        ST         -->   %04X\n", data );
+      else
+        printf ( "[STK]        L%02d        -->   %04X\n", (int) ind-1, data );
+      break;
+    case STACK_ACCESS_WRITE:
+      if ( ind == 0 )
+        printf ( "[STK]        ST         <--   %04X\n", data );
+      else
+        printf ( "[STK]        L%02d        <--   %04X\n", (int) ind-1, data );
+      break;
+    default: break;
+    }
+  
+} // end stack_access
+
+
 
 
 /**********************/
@@ -205,6 +240,7 @@ debug_tracer_new (
   ret= g_new ( DebugTracer, 1 );
   ret->exec_inst= exec_inst;
   ret->mem_access= mem_access;
+  ret->stack_access= stack_access;
   ret->flags= init_flags;
 
   return ret;
