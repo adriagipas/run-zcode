@@ -28,7 +28,8 @@
 typedef enum
   {
     INSTRUCTION_NAME_UNK= 0,
-    INSTRUCTION_NAME_CALL
+    INSTRUCTION_NAME_CALL,
+    INSTRUCTION_NAME_JL
   } InstructionName;
 
 typedef enum
@@ -39,7 +40,13 @@ typedef enum
     INSTRUCTION_OP_TYPE_GLOBAL_VARIABLE,
     INSTRUCTION_OP_TYPE_LARGE_CONSTANT,
     INSTRUCTION_OP_TYPE_SMALL_CONSTANT,
-    INSTRUCTION_OP_TYPE_ROUTINE
+    INSTRUCTION_OP_TYPE_ROUTINE,
+    INSTRUCTION_OP_TYPE_BRANCH_IF_TRUE,
+    INSTRUCTION_OP_TYPE_BRANCH_IF_FALSE,
+    INSTRUCTION_OP_TYPE_RETURN_TRUE_IF_TRUE,
+    INSTRUCTION_OP_TYPE_RETURN_TRUE_IF_FALSE,
+    INSTRUCTION_OP_TYPE_RETURN_FALSE_IF_TRUE,
+    INSTRUCTION_OP_TYPE_RETURN_FALSE_IF_FALSE
   } InstructionOpType;
 
 typedef struct
@@ -48,7 +55,7 @@ typedef struct
   int               ind; // Local Variable/Global Variable
   uint8_t           u8;  // Small constant
   uint16_t          u16; // Large constant/Routine packed
-  uint32_t          u32; // Routine unpacked
+  uint32_t          u32; // Routine unpacked/Branch offset (amb el -2 inclòs)
 } InstructionOp;
 
 typedef struct
@@ -62,6 +69,8 @@ typedef struct
   int              nops;
   bool             store;
   InstructionOp    store_op;
+  bool             branch;
+  InstructionOp    branch_op;
   // branch offset
   
 } Instruction;

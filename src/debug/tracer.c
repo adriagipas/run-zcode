@@ -59,6 +59,7 @@ get_inst_name (
   switch ( name )
     {
     case INSTRUCTION_NAME_CALL: return "call    ";
+    case INSTRUCTION_NAME_JL  : return "jl      ";
     case INSTRUCTION_NAME_UNK :
     default                   : return "unknown ";
     }
@@ -68,7 +69,8 @@ get_inst_name (
 
 static void
 print_inst_op (
-               const InstructionOp *op
+               const InstructionOp *op,
+               const uint32_t       next_addr
                )
 {
 
@@ -93,6 +95,26 @@ print_inst_op (
     case INSTRUCTION_OP_TYPE_ROUTINE:
       printf ( "ROUTINE:%X [PADDR:%04X]", op->u32, op->u16 );
       break;
+    case INSTRUCTION_OP_TYPE_BRANCH_IF_TRUE:
+      printf ( "GOTO %08X (%d) IF true",
+               next_addr+op->u32, (int32_t) op->u32 );
+      break;
+    case INSTRUCTION_OP_TYPE_BRANCH_IF_FALSE:
+      printf ( "GOTO %08X (%d) IF false",
+               next_addr+op->u32, (int32_t) op->u32 );
+      break;
+    case INSTRUCTION_OP_TYPE_RETURN_TRUE_IF_TRUE:
+      printf ( "RETURN true IF true" );
+      break;
+    case INSTRUCTION_OP_TYPE_RETURN_TRUE_IF_FALSE:
+      printf ( "RETURN true IF false" );
+      break;
+    case INSTRUCTION_OP_TYPE_RETURN_FALSE_IF_TRUE:
+      printf ( "RETURN false IF true" );
+      break;
+    case INSTRUCTION_OP_TYPE_RETURN_FALSE_IF_FALSE:
+      printf ( "RETURN false IF false" );
+      break;
     default:
       printf ( "??? %d", op->type );
     }
@@ -109,10 +131,13 @@ exec_inst (
 
   DebugTracer *self;
   int n;
+  uint32_t next_addr;
   
 
   self= DEBUG_TRACER(self_);
   if ( (self->flags&DEBUG_TRACER_FLAGS_CPU) == 0  ) return;
+
+  next_addr= ins->addr + ((uint32_t) ins->nbytes);
   
   printf ( "[CPU]  ADDR: %08X  ", ins->addr );
   for ( n= 0; n < ins->nbytes; ++n ) printf ( " %02X", ins->bytes[n] );
@@ -120,17 +145,22 @@ exec_inst (
   printf ( "%s", get_inst_name ( ins->name ) );
   if ( ins->nops > 0 )
     {
-      print_inst_op ( &(ins->ops[0]) );
+      print_inst_op ( &(ins->ops[0]), next_addr );
       for ( n= 1; n < ins->nops; ++n )
         {
           putchar ( ',' );
-          print_inst_op ( &(ins->ops[n]) );
+          print_inst_op ( &(ins->ops[n]), next_addr );
         }
     }
   if ( ins->store )
     {
       printf ( " -->" );
-      print_inst_op ( &(ins->store_op) );
+      print_inst_op ( &(ins->store_op), next_addr );
+    }
+  if ( ins->branch )
+    {
+      printf ( "   ?" );
+      print_inst_op ( &(ins->branch_op), next_addr );
     }
   putchar ( '\n' );
   

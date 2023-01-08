@@ -109,6 +109,7 @@ read_var_ops (
 
   uint8_t ops_type;
   int N,n;
+  bool stop;
 
   
   // Llig tipus
@@ -119,6 +120,7 @@ read_var_ops (
 
   // Processa tipus
   N= 0;
+  stop= false;
   do {
     switch ( ops_type>>6 )
       {
@@ -133,11 +135,12 @@ read_var_ops (
         break;
       case 3:
         ins->ops[N].type= INSTRUCTION_OP_TYPE_NONE;
+        stop= true;
         break;
       }
     ops_type<<= 2;
-  } while ( N < 4 && ins->ops[N].type != INSTRUCTION_OP_TYPE_NONE );
-
+  } while ( N < 4 && !stop );
+  
   // Llig valors
   for ( n= 0; n < N; ++n )
     if ( ins->ops[n].type == INSTRUCTION_OP_TYPE_LARGE_CONSTANT )
@@ -185,6 +188,125 @@ read_var_ops_store (
   return true;
   
 } // end read_var_ops_store
+
+
+static bool
+read_branch (
+             Instruction      *ins,
+             const MemoryMap  *mem,
+             uint32_t         *addr,
+             char            **err
+             )
+{
+
+  uint8_t b1,b2;
+  bool cond_value;
+  
+
+  // Llig valors, calcula offset i valor condició.
+  if ( !memory_map_READB ( mem, *addr, &b1, true, err ) )
+    return false;
+  ++(*addr);
+  ins->bytes[ins->nbytes++]= b1;
+  if ( (b1&0x40) == 0 )
+    {
+      if ( !memory_map_READB ( mem, *addr, &b2, true, err ) )
+        return false;
+      ++(*addr);
+      ins->bytes[ins->nbytes++]= b2;
+      ins->branch_op.u32= (((uint32_t) (b1&0x3F))<<8) | ((uint32_t) b2);
+      if ( ins->branch_op.u32&0x2000 )
+        ins->branch_op.u32= ((uint32_t) -((int32_t) ins->branch_op.u32));
+    }
+  else ins->branch_op.u32= (uint32_t) (b1&0x3F);
+  cond_value= ((b1&0x80)!=0); // True si bit7 està actiu.
+
+  // Assigna tipus
+  ins->branch= true;
+  if ( ins->branch_op.u32 == 0 )
+    ins->branch_op.type=
+      cond_value ?
+      INSTRUCTION_OP_TYPE_RETURN_FALSE_IF_TRUE :
+      INSTRUCTION_OP_TYPE_RETURN_FALSE_IF_FALSE
+      ;
+  else if ( ins->branch_op.u32 == 1 )
+    ins->branch_op.type=
+      cond_value ?
+      INSTRUCTION_OP_TYPE_RETURN_TRUE_IF_TRUE :
+      INSTRUCTION_OP_TYPE_RETURN_TRUE_IF_FALSE
+      ;
+  else
+    {
+      ins->branch_op.type=
+      cond_value ?
+      INSTRUCTION_OP_TYPE_BRANCH_IF_TRUE :
+      INSTRUCTION_OP_TYPE_BRANCH_IF_FALSE
+      ;
+      ins->branch_op.u32-= 2;
+    }
+
+  return true;
+  
+} // end read_branch
+
+
+static bool
+ins_2op (
+         Instruction            *ins,
+         const MemoryMap        *mem,
+         uint32_t               *addr,
+         const InstructionName   name,
+         char                  **err
+         )
+{
+
+  uint8_t opcode;
+
+  
+  ins->name= name;
+  opcode= ins->bytes[ins->nbytes-1]; // Byte anterior
+
+  // Primer operador.
+  if ( !memory_map_READB ( mem, *addr, &(ins->ops[ins->nops].u8), true, err ) )
+    return false;
+  ++(*addr);
+  ins->bytes[ins->nbytes++]= ins->ops[ins->nops].u8;
+  if ( opcode&0x40 ) set_variable_type ( &(ins->ops[ins->nops]) );
+  else ins->ops[ins->nops].type= INSTRUCTION_OP_TYPE_SMALL_CONSTANT;
+  ++(ins->nops);
+
+  // Segon operador.
+  if ( !memory_map_READB ( mem, *addr, &(ins->ops[ins->nops].u8), true, err ) )
+    return false;
+  ++(*addr);
+  ins->bytes[ins->nbytes++]= ins->ops[ins->nops].u8;
+  if ( opcode&0x20 ) set_variable_type ( &(ins->ops[ins->nops]) );
+  else ins->ops[ins->nops].type= INSTRUCTION_OP_TYPE_SMALL_CONSTANT;
+  ++(ins->nops);
+
+  return true;
+  
+} // end ins_2op
+
+
+static bool
+ins_2op_branch (
+                Instruction            *ins,
+                const MemoryMap        *mem,
+                uint32_t               *addr,
+                const InstructionName   name,
+                char                  **err
+                )
+{
+
+  if ( !ins_2op ( ins, mem, addr, name, err ) )
+    return false;
+  if ( !read_branch ( ins, mem, addr, err ) )
+    return false;
+
+  return true;
+  
+} // end ins_2op_branch
 
 
 static bool
@@ -236,9 +358,37 @@ decode_next_inst (
   switch ( opcode )
     {
 
+    case 0x02: // jl
+      if ( !ins_2op_branch ( ins, mem, &addr, INSTRUCTION_NAME_JL, err ) )
+        return false;
+      break;
+
+    case 0x22: // jl
+      if ( !ins_2op_branch ( ins, mem, &addr, INSTRUCTION_NAME_JL, err ) )
+        return false;
+      break;
+
+    case 0x42: // jl
+      if ( !ins_2op_branch ( ins, mem, &addr, INSTRUCTION_NAME_JL, err ) )
+        return false;
+      break;
+
+    case 0x62: // jl
+      if ( !ins_2op_branch ( ins, mem, &addr, INSTRUCTION_NAME_JL, err ) )
+        return false;
+      break;
+      
     case 0xe0: // call_vs
       if ( !read_var_ops_store ( ins, mem, &addr, err ) ) return false;
       if ( !ins_call ( ins, mem, err ) ) return false;
+      break;
+
+    case 0xf9: // call_vn
+      if ( mem->sf_mem[0] >= 5 )
+        {
+          if ( !read_var_ops ( ins, mem, &addr, err ) ) return false;
+          if ( !ins_call ( ins, mem, err ) ) return false;
+        }
       break;
       
     default: // Descodifica com UNK
@@ -300,6 +450,7 @@ instruction_disassemble (
   ins->nbytes= 0;
   ins->nops= 0;
   ins->store= false;
+  ins->branch= false;
 
   // Decodifica.
   if ( !decode_next_inst ( ins, mem, err ) )

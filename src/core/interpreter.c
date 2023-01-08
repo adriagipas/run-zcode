@@ -47,6 +47,14 @@
 #define RET_STOP     1
 #define RET_ERROR    -1
 
+#define SET_U8TOU16(SRC,DST)                                            \
+  {                                                                     \
+    (DST)= (uint16_t) (SRC);                                            \
+    if ( (SRC) >= 0x80 )                                                \
+      ww ( "interpreter.c - %d - CAL COMPROVAR SI ESTÀ BÉ EL SIGNE!",   \
+           __LINE__ );                                                  \
+  }
+
 
 
 
@@ -223,9 +231,7 @@ call_routine (
           local_vars[i-1]= ops[i].u16.val;
           break;
         case OP_SMALL:
-          local_vars[i-1]= (uint16_t) ops[i].u8.val; // Amb o sense signe
-          ww ( "interpreter.c - call_routine - CAL"
-               " COMPROVAR SI ESTÀ BÉ EL SIGNE!" );
+          SET_U8TOU16(ops[i].u8.val,local_vars[i-1]);
           break;
         case OP_VARIABLE:
           if ( !read_var ( intp, ops[i].u8.val, &(local_vars[i-1]), err ) )
@@ -298,6 +304,93 @@ read_var_ops (
 
 
 static bool
+read_small_small (
+                  Interpreter  *intp,
+                  uint8_t      *op1,
+                  uint8_t      *op2,
+                  char        **err
+                  )
+{
+
+  if ( !memory_map_READB ( intp->mem, intp->state->PC++, op1, true, err ) )
+    return false;
+  if ( !memory_map_READB ( intp->mem, intp->state->PC++, op2, true, err ) )
+    return false;
+
+  return true;
+  
+} // end read_small_small
+
+
+static bool
+read_small_var (
+                Interpreter  *intp,
+                uint8_t      *op1,
+                uint16_t     *op2,
+                char        **err
+                )
+{
+
+  uint8_t tmp2;
+
+  
+  if ( !read_small_small ( intp, op1, &tmp2, err ) )
+    return false;
+  if ( !read_var ( intp, tmp2, op2, err ) )
+    return false;
+  
+  return true;
+  
+} // end read_small_var
+
+
+static bool
+read_var_small (
+                Interpreter  *intp,
+                uint16_t     *op1,
+                uint8_t      *op2,
+                char        **err
+                )
+{
+
+  uint8_t tmp1;
+
+  
+  if ( !read_small_small ( intp, &tmp1, op2, err ) )
+    return false;
+  if ( !read_var ( intp, tmp1, op1, err ) )
+    return false;
+  
+  return true;
+  
+} // end read_var_small
+
+
+static bool
+read_var_var (
+              Interpreter  *intp,
+              uint16_t     *op1,
+              uint16_t     *op2,
+              char        **err
+              )
+{
+
+  uint8_t tmp1,tmp2;
+
+  
+  if ( !read_small_small ( intp, &tmp1, &tmp2, err ) )
+    return false;
+  if ( !read_var ( intp, tmp1, op1, err ) )
+    return false;
+  if ( !read_var ( intp, tmp2, op2, err ) )
+    return false;
+  
+  return true;
+  
+} // end read_var_var
+
+
+static bool
 read_var_ops_store (
                     Interpreter  *intp,
                     operand_t    *ops,
@@ -318,6 +411,51 @@ read_var_ops_store (
 } // end read_var_ops_store
 
 
+static bool
+branch (
+        Interpreter  *intp,
+        const bool    cond,
+        char        **err
+        )
+{
+
+  uint8_t b1,b2;
+  uint32_t offset;
+  State *state;
+  bool cond_value;
+  
+  
+  state= intp->state;
+  if ( !memory_map_READB ( intp->mem, state->PC++, &b1, true, err ) )
+    return false;
+  if ( (b1&0x40) == 0 )
+    {
+      if ( !memory_map_READB ( intp->mem, state->PC++, &b2, true, err ) )
+        return false;
+      // 14bits amb signe
+      offset= (((uint32_t) (b1&0x3F))<<8) | ((uint32_t) b2);
+      if ( offset&0x2000 )
+        offset= ((uint32_t) -((int32_t) offset));
+    }
+  else offset= (uint32_t) (b1&0x3F);
+  cond_value= ((b1&0x80)!=0); // True si bit7 està actiu.
+
+  // Bot
+  if ( cond == cond_value )
+    {
+      if ( offset == 0 )
+        ee ( "CAL_IMPLEMENTAR return false" );
+      else if ( offset == 1 )
+        ee ( "CAL_IMPLEMENTAR return true" );
+      else
+        state->PC+= offset-2;
+    }
+  
+  return true;
+  
+} // end branch;
+
+
 static int
 exec_next_inst (
                 Interpreter  *intp,
@@ -326,7 +464,8 @@ exec_next_inst (
 {
 
   int nops;
-  uint8_t opcode,result_var;
+  uint8_t opcode,result_var,op1_u8,op2_u8;
+  uint16_t op1,op2;
   State *state;
   operand_t ops[8];
   
@@ -337,10 +476,46 @@ exec_next_inst (
   switch ( opcode )
     {
       
+    case 0x02: // jl
+      if ( !read_small_small ( intp, &op1_u8, &op2_u8, err ) ) return false;
+      SET_U8TOU16(op1_u8,op1);
+      SET_U8TOU16(op2_u8,op2);
+      if ( !branch ( intp, ((int16_t) op1) < ((int16_t) op2), err ) )
+        return false;
+      break;
+
+    case 0x22: // jl
+      if ( !read_small_var ( intp, &op1_u8, &op2, err ) ) return false;
+      SET_U8TOU16(op1_u8,op1);
+      if ( !branch ( intp, ((int16_t) op1) < ((int16_t) op2), err ) )
+        return false;
+      break;
+
+    case 0x42: // jl
+      if ( !read_var_small ( intp, &op1, &op2_u8, err ) ) return false;
+      SET_U8TOU16(op2_u8,op2);
+      if ( !branch ( intp, ((int16_t) op1) < ((int16_t) op2), err ) )
+        return false;
+      break;
+
+    case 0x62: // jl
+      if ( !read_var_var ( intp, &op1, &op2, err ) ) return false;
+      if ( !branch ( intp, ((int16_t) op1) < ((int16_t) op2), err ) )
+        return false;
+      break;
+      
     case 0xe0: // call_vs
       if ( !read_var_ops_store ( intp, ops, &nops, &result_var, err ) )
         return RET_ERROR;
       if ( !call_routine ( intp, ops, nops, result_var, false, err ) )
+        return RET_ERROR;
+      break;
+
+    case 0xf9: // call_vn
+      if ( intp->version < 5 ) goto wrong_version;
+      if ( !read_var_ops ( intp, ops, &nops, err ) )
+        return RET_ERROR;
+      if ( !call_routine ( intp, ops, nops, 0x00, true, err ) )
         return RET_ERROR;
       break;
       
@@ -350,6 +525,11 @@ exec_next_inst (
     }
 
   return RET_CONTINUE;
+
+ wrong_version:
+  msgerror ( err, "Instruction opcode %02X (%d) is not supported in version %d",
+             opcode, opcode, intp->version );
+  return RET_ERROR;
   
 } // end exec_next_inst
 
