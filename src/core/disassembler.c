@@ -319,13 +319,13 @@ ins_call (
   
   if ( ins->nops == 0 )
     {
-      msgerror ( err, "Failed to diassemble call instruction: missing"
+      msgerror ( err, "Failed to disassemble call instruction: missing"
                  " routine argument" );
       return false;
     }
   if ( ins->ops[0].type != INSTRUCTION_OP_TYPE_LARGE_CONSTANT )
     {
-      msgerror ( err, "Failed to diassemble call instruction: "
+      msgerror ( err, "Failed to disassemble call instruction: "
                  "invalid operand type for routine argument" );
       return false;
     }
@@ -335,6 +335,27 @@ ins_call (
   return true;
   
 } // end ins_call
+
+
+static bool
+ins_var_2ops (
+              Instruction            *ins,
+              const InstructionName   name,
+              char                  **err
+              )
+{
+  
+  if ( ins->nops != 2 )
+    {
+      msgerror ( err, "Failed to disassemble 2OP instruction in"
+                 " VAR format: provided %d operands", ins->nops );
+      return false;
+    }
+  ins->name= name;
+  
+  return true;
+  
+} // end ins_var_2ops
 
 
 static bool
@@ -362,9 +383,17 @@ decode_next_inst (
       if ( !ins_2op_branch ( ins, mem, &addr, INSTRUCTION_NAME_JL, err ) )
         return false;
       break;
+    case 0x03: // jg
+      if ( !ins_2op_branch ( ins, mem, &addr, INSTRUCTION_NAME_JG, err ) )
+        return false;
+      break;
 
     case 0x22: // jl
       if ( !ins_2op_branch ( ins, mem, &addr, INSTRUCTION_NAME_JL, err ) )
+        return false;
+      break;
+    case 0x23: // jg
+      if ( !ins_2op_branch ( ins, mem, &addr, INSTRUCTION_NAME_JG, err ) )
         return false;
       break;
 
@@ -372,10 +401,23 @@ decode_next_inst (
       if ( !ins_2op_branch ( ins, mem, &addr, INSTRUCTION_NAME_JL, err ) )
         return false;
       break;
+    case 0x43: // jg
+      if ( !ins_2op_branch ( ins, mem, &addr, INSTRUCTION_NAME_JG, err ) )
+        return false;
+      break;
 
     case 0x62: // jl
       if ( !ins_2op_branch ( ins, mem, &addr, INSTRUCTION_NAME_JL, err ) )
         return false;
+      break;
+    case 0x63: // jg
+      if ( !ins_2op_branch ( ins, mem, &addr, INSTRUCTION_NAME_JG, err ) )
+        return false;
+      break;
+
+    case 0xd5: // sub
+      if ( !read_var_ops_store ( ins, mem, &addr, err ) ) return false;
+      if ( !ins_var_2ops ( ins, INSTRUCTION_NAME_SUB, err ) ) return false;
       break;
       
     case 0xe0: // call_vs

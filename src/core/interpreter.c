@@ -150,6 +150,32 @@ read_var (
 } // end read_var
 
 
+static bool
+write_var (
+           Interpreter     *intp,
+           const uint8_t    var,
+           const uint16_t   val,
+           char           **err
+          )
+{
+
+  State *state;
+  
+  
+  state= intp->state;
+  if ( var <= 0x0f ) // Pila o variables locals
+    {
+      if ( !state_writevar ( state, var, val, err ) )
+        return false;
+    }
+  else // Variables globals
+    memory_map_writevar ( intp->mem, (int) ((uint32_t) (var-0x10)), val );
+  
+  return true;
+  
+} // end write_var
+
+
 // NOTA!! S'espera sempre que el primer argument siga la rutina però
 // no s'ha comprovat res.
 static bool
@@ -412,6 +438,59 @@ read_var_ops_store (
 
 
 static bool
+op_to_u16 (
+           Interpreter      *intp,
+           const operand_t  *op,
+           uint16_t         *ret,
+           char            **err
+           )
+{
+
+  switch ( op->type )
+    {
+    case OP_LARGE: *ret= op->u16.val; break;
+    case OP_SMALL: SET_U8TOU16(op->u8.val,*ret); break;
+    case OP_VARIABLE:
+      if ( !read_var ( intp, op->u8.val, ret, err ) )
+        return false;
+      break;
+    default:
+      ee ( "interpreter.c - op_to_u16 - WTF!!" );
+    }
+
+  return true;
+  
+} // end op_to_u16
+
+
+static bool
+ops_to_u16_u16 (
+                Interpreter      *intp,
+                const operand_t  *ops,
+                const int         nops,
+                uint16_t         *op1,
+                uint16_t         *op2,
+                char            **err
+                )
+{
+
+  if ( nops != 2 )
+    {
+      msgerror ( err, "Failed to execute 2OP instruction in VAR format:"
+                 " %d operands supplied", nops );
+      return false;
+    }
+  if ( !op_to_u16 ( intp, &(ops[0]), op1, err ) )
+    return false;
+  if ( !op_to_u16 ( intp, &(ops[1]), op2, err ) )
+    return false;
+
+  return true;
+  
+} // end ops_to_u16_u16
+
+
+static bool
 branch (
         Interpreter  *intp,
         const bool    cond,
@@ -465,7 +544,7 @@ exec_next_inst (
 
   int nops;
   uint8_t opcode,result_var,op1_u8,op2_u8;
-  uint16_t op1,op2;
+  uint16_t op1,op2,res;
   State *state;
   operand_t ops[8];
   
@@ -477,31 +556,64 @@ exec_next_inst (
     {
       
     case 0x02: // jl
-      if ( !read_small_small ( intp, &op1_u8, &op2_u8, err ) ) return false;
+      if ( !read_small_small ( intp, &op1_u8, &op2_u8, err ) ) return RET_ERROR;
       SET_U8TOU16(op1_u8,op1);
       SET_U8TOU16(op2_u8,op2);
       if ( !branch ( intp, ((int16_t) op1) < ((int16_t) op2), err ) )
-        return false;
+        return RET_ERROR;
+      break;
+    case 0x03: // jg
+      if ( !read_small_small ( intp, &op1_u8, &op2_u8, err ) ) return RET_ERROR;
+      SET_U8TOU16(op1_u8,op1);
+      SET_U8TOU16(op2_u8,op2);
+      if ( !branch ( intp, ((int16_t) op1) > ((int16_t) op2), err ) )
+        return RET_ERROR;
       break;
 
     case 0x22: // jl
-      if ( !read_small_var ( intp, &op1_u8, &op2, err ) ) return false;
+      if ( !read_small_var ( intp, &op1_u8, &op2, err ) ) return RET_ERROR;
       SET_U8TOU16(op1_u8,op1);
       if ( !branch ( intp, ((int16_t) op1) < ((int16_t) op2), err ) )
-        return false;
+        return RET_ERROR;
+      break;
+    case 0x23: // jg
+      if ( !read_small_var ( intp, &op1_u8, &op2, err ) ) return RET_ERROR;
+      SET_U8TOU16(op1_u8,op1);
+      if ( !branch ( intp, ((int16_t) op1) > ((int16_t) op2), err ) )
+        return RET_ERROR;
       break;
 
     case 0x42: // jl
-      if ( !read_var_small ( intp, &op1, &op2_u8, err ) ) return false;
+      if ( !read_var_small ( intp, &op1, &op2_u8, err ) ) return RET_ERROR;
       SET_U8TOU16(op2_u8,op2);
       if ( !branch ( intp, ((int16_t) op1) < ((int16_t) op2), err ) )
-        return false;
+        return RET_ERROR;
+      break;
+    case 0x43: // jg
+      if ( !read_var_small ( intp, &op1, &op2_u8, err ) ) return RET_ERROR;
+      SET_U8TOU16(op2_u8,op2);
+      if ( !branch ( intp, ((int16_t) op1) > ((int16_t) op2), err ) )
+        return RET_ERROR;
       break;
 
     case 0x62: // jl
-      if ( !read_var_var ( intp, &op1, &op2, err ) ) return false;
+      if ( !read_var_var ( intp, &op1, &op2, err ) ) return RET_ERROR;
       if ( !branch ( intp, ((int16_t) op1) < ((int16_t) op2), err ) )
-        return false;
+        return RET_ERROR;
+      break;
+    case 0x63: // jg
+      if ( !read_var_var ( intp, &op1, &op2, err ) ) return RET_ERROR;
+      if ( !branch ( intp, ((int16_t) op1) > ((int16_t) op2), err ) )
+        return RET_ERROR;
+      break;
+
+    case 0xd5: // sub
+      if ( !read_var_ops_store ( intp, ops, &nops, &result_var, err ) )
+        return RET_ERROR;
+      if ( !ops_to_u16_u16 ( intp, ops, nops, &op1, &op2, err ) )
+        return RET_ERROR;
+      res= (uint16_t) (((int16_t) op1) - ((int16_t) op2));
+      if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
       break;
       
     case 0xe0: // call_vs

@@ -29,7 +29,9 @@ typedef enum
   {
     INSTRUCTION_NAME_UNK= 0,
     INSTRUCTION_NAME_CALL,
-    INSTRUCTION_NAME_JL
+    INSTRUCTION_NAME_JG,
+    INSTRUCTION_NAME_JL,
+    INSTRUCTION_NAME_SUB
   } InstructionName;
 
 typedef enum
