@@ -176,6 +176,32 @@ write_var (
 } // end write_var
 
 
+static bool
+op_to_u16 (
+           Interpreter      *intp,
+           const operand_t  *op,
+           uint16_t         *ret,
+           char            **err
+           )
+{
+
+  switch ( op->type )
+    {
+    case OP_LARGE: *ret= op->u16.val; break;
+    case OP_SMALL: SET_U8TOU16(op->u8.val,*ret); break;
+    case OP_VARIABLE:
+      if ( !read_var ( intp, op->u8.val, ret, err ) )
+        return false;
+      break;
+    default:
+      ee ( "interpreter.c - op_to_u16 - WTF!!" );
+    }
+
+  return true;
+  
+} // end op_to_u16
+
+
 // NOTA!! S'espera sempre que el primer argument siga la rutina però
 // no s'ha comprovat res.
 static bool
@@ -222,13 +248,6 @@ call_routine (
                  ops[0].u16.val, num_local_vars );
       return false;
     }
-  if ( nops-1 > (int) num_local_vars )
-    {
-      msgerror ( err, "Failed to call routine (PADDR: %X): "
-                 "supplied more arguments (%d) than local variables (%u)",
-                 ops[0].u16.val, nops-1, num_local_vars );
-      return false;
-    }
   // --> Valors inicials
   if ( intp->version <= 4 )
     {
@@ -248,24 +267,11 @@ call_routine (
 
   // Assigna arguments
   args_mask= 0x00;
-  for ( i= 1; i < nops; ++i )
+  for ( i= 1; i < nops && i <= num_local_vars; ++i )
     {
       args_mask|= 0x1<<(i-1);
-      switch ( ops[i].type )
-        {
-        case OP_LARGE:
-          local_vars[i-1]= ops[i].u16.val;
-          break;
-        case OP_SMALL:
-          SET_U8TOU16(ops[i].u8.val,local_vars[i-1]);
-          break;
-        case OP_VARIABLE:
-          if ( !read_var ( intp, ops[i].u8.val, &(local_vars[i-1]), err ) )
-            return false;
-          break;
-        case OP_NONE:
-          ee ( "interpreter.c - call_routine - unexpected error" );
-        }
+      if ( !op_to_u16 ( intp, &(ops[i]), &(local_vars[i-1]), err ) )
+        return false;
     }
 
   // Crea nou frame
@@ -286,6 +292,7 @@ read_var_ops (
               Interpreter  *intp,
               operand_t    *ops,
               int          *nops,
+              const int     wanted_ops, // -1 vol dir que no es demana
               char        **err
               )
 {
@@ -306,8 +313,13 @@ read_var_ops (
       ++N;
       ops_type<<= 2;
     }
+  if ( wanted_ops != -1 && wanted_ops != N )
+    {
+      msgerror ( err, "Expected %d operands but %d found", wanted_ops, N );
+      return false;
+    }
   *nops= N;
-
+  
   // Llig valors
   for ( n= 0; n < N; ++n )
     if ( ops[n].type == OP_LARGE )
@@ -349,6 +361,29 @@ read_small_small (
 
 
 static bool
+read_small_small_store (
+                        Interpreter  *intp,
+                        uint8_t      *op1,
+                        uint8_t      *op2,
+                        uint8_t      *store_var,
+                        char        **err
+                        )
+{
+
+  if ( !memory_map_READB ( intp->mem, intp->state->PC++, op1, true, err ) )
+    return false;
+  if ( !memory_map_READB ( intp->mem, intp->state->PC++, op2, true, err ) )
+    return false;
+  if ( !memory_map_READB ( intp->mem, intp->state->PC++,
+                           store_var, true, err ) )
+    return false;
+
+  return true;
+  
+} // end read_small_small_store
+
+
+static bool
 read_small_var (
                 Interpreter  *intp,
                 uint8_t      *op1,
@@ -371,6 +406,29 @@ read_small_var (
 
 
 static bool
+read_small_var_store (
+                      Interpreter  *intp,
+                      uint8_t      *op1,
+                      uint16_t     *op2,
+                      uint8_t      *store_var,
+                      char        **err
+                      )
+{
+
+  uint8_t tmp2;
+
+  
+  if ( !read_small_small_store ( intp, op1, &tmp2, store_var, err ) )
+    return false;
+  if ( !read_var ( intp, tmp2, op2, err ) )
+    return false;
+  
+  return true;
+  
+} // end read_small_var_store
+
+
+static bool
 read_var_small (
                 Interpreter  *intp,
                 uint16_t     *op1,
@@ -390,6 +448,29 @@ read_var_small (
   return true;
   
 } // end read_var_small
+
+
+static bool
+read_var_small_store (
+                      Interpreter  *intp,
+                      uint16_t     *op1,
+                      uint8_t      *op2,
+                      uint8_t      *store_var,
+                      char        **err
+                      )
+{
+
+  uint8_t tmp1;
+
+  
+  if ( !read_small_small_store ( intp, &tmp1, op2, store_var, err ) )
+    return false;
+  if ( !read_var ( intp, tmp1, op1, err ) )
+    return false;
+  
+  return true;
+  
+} // end read_var_small_store
 
 
 static bool
@@ -417,16 +498,42 @@ read_var_var (
 
 
 static bool
-read_var_ops_store (
+read_var_var_store (
                     Interpreter  *intp,
-                    operand_t    *ops,
-                    int          *nops,
+                    uint16_t     *op1,
+                    uint16_t     *op2,
                     uint8_t      *store_var,
                     char        **err
                     )
 {
 
-  if ( !read_var_ops ( intp, ops, nops, err ) )
+  uint8_t tmp1,tmp2;
+
+  
+  if ( !read_small_small_store ( intp, &tmp1, &tmp2, store_var, err ) )
+    return false;
+  if ( !read_var ( intp, tmp1, op1, err ) )
+    return false;
+  if ( !read_var ( intp, tmp2, op2, err ) )
+    return false;
+  
+  return true;
+  
+} // end read_var_var_store
+
+
+static bool
+read_var_ops_store (
+                    Interpreter  *intp,
+                    operand_t    *ops,
+                    int          *nops,
+                    const int     wanted_ops,
+                    uint8_t      *store_var,
+                    char        **err
+                    )
+{
+
+  if ( !read_var_ops ( intp, ops, nops, wanted_ops, err ) )
     return false;
   if ( !memory_map_READB ( intp->mem, intp->state->PC++,
                            store_var, true, err ) )
@@ -435,59 +542,6 @@ read_var_ops_store (
   return true;
   
 } // end read_var_ops_store
-
-
-static bool
-op_to_u16 (
-           Interpreter      *intp,
-           const operand_t  *op,
-           uint16_t         *ret,
-           char            **err
-           )
-{
-
-  switch ( op->type )
-    {
-    case OP_LARGE: *ret= op->u16.val; break;
-    case OP_SMALL: SET_U8TOU16(op->u8.val,*ret); break;
-    case OP_VARIABLE:
-      if ( !read_var ( intp, op->u8.val, ret, err ) )
-        return false;
-      break;
-    default:
-      ee ( "interpreter.c - op_to_u16 - WTF!!" );
-    }
-
-  return true;
-  
-} // end op_to_u16
-
-
-static bool
-ops_to_u16_u16 (
-                Interpreter      *intp,
-                const operand_t  *ops,
-                const int         nops,
-                uint16_t         *op1,
-                uint16_t         *op2,
-                char            **err
-                )
-{
-
-  if ( nops != 2 )
-    {
-      msgerror ( err, "Failed to execute 2OP instruction in VAR format:"
-                 " %d operands supplied", nops );
-      return false;
-    }
-  if ( !op_to_u16 ( intp, &(ops[0]), op1, err ) )
-    return false;
-  if ( !op_to_u16 ( intp, &(ops[1]), op2, err ) )
-    return false;
-
-  return true;
-  
-} // end ops_to_u16_u16
 
 
 static bool
@@ -554,7 +608,13 @@ exec_next_inst (
     return RET_ERROR;
   switch ( opcode )
     {
-      
+
+    case 0x01: // je
+      if ( !read_small_small ( intp, &op1_u8, &op2_u8, err ) ) return RET_ERROR;
+      SET_U8TOU16(op1_u8,op1);
+      SET_U8TOU16(op2_u8,op2);
+      if ( !branch ( intp, op1 == op2, err ) ) return RET_ERROR;
+      break;
     case 0x02: // jl
       if ( !read_small_small ( intp, &op1_u8, &op2_u8, err ) ) return RET_ERROR;
       SET_U8TOU16(op1_u8,op1);
@@ -570,6 +630,20 @@ exec_next_inst (
         return RET_ERROR;
       break;
 
+    case 0x14: // add
+      if ( !read_small_small_store ( intp, &op1_u8, &op2_u8, &result_var, err ))
+        return RET_ERROR;
+      SET_U8TOU16(op1_u8,op1);
+      SET_U8TOU16(op2_u8,op2);
+      res= (uint16_t) (((int16_t) op1) + ((int16_t) op2));
+      if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
+      break;
+
+    case 0x21: // je
+      if ( !read_small_var ( intp, &op1_u8, &op2, err ) ) return RET_ERROR;
+      SET_U8TOU16(op1_u8,op1);
+      if ( !branch ( intp, op1 == op2, err ) ) return RET_ERROR;
+      break;
     case 0x22: // jl
       if ( !read_small_var ( intp, &op1_u8, &op2, err ) ) return RET_ERROR;
       SET_U8TOU16(op1_u8,op1);
@@ -583,6 +657,19 @@ exec_next_inst (
         return RET_ERROR;
       break;
 
+    case 0x34: // add
+      if ( !read_small_var_store ( intp, &op1_u8, &op2, &result_var, err ) )
+        return RET_ERROR;
+      SET_U8TOU16(op1_u8,op1);
+      res= (uint16_t) (((int16_t) op1) + ((int16_t) op2));
+      if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
+      break;
+
+    case 0x41: // je
+      if ( !read_var_small ( intp, &op1, &op2_u8, err ) ) return RET_ERROR;
+      SET_U8TOU16(op2_u8,op2);
+      if ( !branch ( intp, op1 == op2, err ) ) return RET_ERROR;
+      break;
     case 0x42: // jl
       if ( !read_var_small ( intp, &op1, &op2_u8, err ) ) return RET_ERROR;
       SET_U8TOU16(op2_u8,op2);
@@ -596,6 +683,18 @@ exec_next_inst (
         return RET_ERROR;
       break;
 
+    case 0x54: // add
+      if ( !read_var_small_store ( intp, &op1, &op2_u8, &result_var, err ) )
+        return RET_ERROR;
+      SET_U8TOU16(op2_u8,op2);
+      res= (uint16_t) (((int16_t) op1) + ((int16_t) op2));
+      if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
+      break;
+
+    case 0x61: // je
+      if ( !read_var_var ( intp, &op1, &op2, err ) ) return RET_ERROR;
+      if ( !branch ( intp, op1 == op2, err ) ) return RET_ERROR;
+      break;
     case 0x62: // jl
       if ( !read_var_var ( intp, &op1, &op2, err ) ) return RET_ERROR;
       if ( !branch ( intp, ((int16_t) op1) < ((int16_t) op2), err ) )
@@ -607,17 +706,24 @@ exec_next_inst (
         return RET_ERROR;
       break;
 
+    case 0x74: // add
+      if ( !read_var_var_store ( intp, &op1, &op2, &result_var, err ) )
+        return RET_ERROR;
+      res= (uint16_t) (((int16_t) op1) + ((int16_t) op2));
+      if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
+      break;
+      
     case 0xd5: // sub
-      if ( !read_var_ops_store ( intp, ops, &nops, &result_var, err ) )
+      if ( !read_var_ops_store ( intp, ops, &nops, 2, &result_var, err ) )
         return RET_ERROR;
-      if ( !ops_to_u16_u16 ( intp, ops, nops, &op1, &op2, err ) )
-        return RET_ERROR;
+      if ( !op_to_u16 ( intp, &(ops[0]), &op1, err ) ) return RET_ERROR;
+      if ( !op_to_u16 ( intp, &(ops[1]), &op2, err ) ) return RET_ERROR;
       res= (uint16_t) (((int16_t) op1) - ((int16_t) op2));
       if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
       break;
       
     case 0xe0: // call_vs
-      if ( !read_var_ops_store ( intp, ops, &nops, &result_var, err ) )
+      if ( !read_var_ops_store ( intp, ops, &nops, -1, &result_var, err ) )
         return RET_ERROR;
       if ( !call_routine ( intp, ops, nops, result_var, false, err ) )
         return RET_ERROR;
@@ -625,12 +731,19 @@ exec_next_inst (
 
     case 0xf9: // call_vn
       if ( intp->version < 5 ) goto wrong_version;
-      if ( !read_var_ops ( intp, ops, &nops, err ) )
+      if ( !read_var_ops ( intp, ops, &nops, -1, err ) )
         return RET_ERROR;
       if ( !call_routine ( intp, ops, nops, 0x00, true, err ) )
         return RET_ERROR;
       break;
-      
+
+    case 0xff: // check_arg_count
+      if ( intp->version < 5 ) goto wrong_version;
+      if ( !read_var_ops ( intp, ops, &nops, 1, err ) ) return RET_ERROR;
+      if ( !op_to_u16 ( intp, &(ops[0]), &op1, err ) ) return RET_ERROR;
+      if ( !branch ( intp, (FRAME_ARGS(state)&(1<<(op1-1)))!=0, err ) )
+        return RET_ERROR;
+      break;
     default: // Unknown
       msgerror ( err, "Unknown instruction opcode %02X (%d)", opcode, opcode );
       return RET_ERROR;

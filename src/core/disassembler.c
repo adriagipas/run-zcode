@@ -310,6 +310,30 @@ ins_2op_branch (
 
 
 static bool
+ins_2op_store (
+               Instruction            *ins,
+               const MemoryMap        *mem,
+               uint32_t               *addr,
+               const InstructionName   name,
+               char                  **err
+               )
+{
+
+  if ( !ins_2op ( ins, mem, addr, name, err ) )
+    return false;
+  if ( !memory_map_READB ( mem, *addr, &(ins->store_op.u8), true, err ) )
+    return false;
+  ++(*addr);
+  ins->bytes[ins->nbytes++]= ins->store_op.u8;
+  set_variable_type ( &(ins->store_op) );
+  ins->store= true;
+  
+  return true;
+  
+} // end ins_2op_store
+
+
+static bool
 ins_call (
           Instruction      *ins,
           const MemoryMap  *mem,
@@ -335,6 +359,27 @@ ins_call (
   return true;
   
 } // end ins_call
+
+
+static bool
+ins_var_1op (
+             Instruction            *ins,
+             const InstructionName   name,
+             char                  **err
+              )
+{
+  
+  if ( ins->nops != 1 )
+    {
+      msgerror ( err, "Failed to disassemble 1OP instruction in"
+                 " VAR format: provided %d operands", ins->nops );
+      return false;
+    }
+  ins->name= name;
+  
+  return true;
+  
+} // end ins_var_1op
 
 
 static bool
@@ -379,6 +424,10 @@ decode_next_inst (
   switch ( opcode )
     {
 
+    case 0x01: // je
+      if ( !ins_2op_branch ( ins, mem, &addr, INSTRUCTION_NAME_JE, err ) )
+        return false;
+      break;
     case 0x02: // jl
       if ( !ins_2op_branch ( ins, mem, &addr, INSTRUCTION_NAME_JL, err ) )
         return false;
@@ -388,6 +437,15 @@ decode_next_inst (
         return false;
       break;
 
+    case 0x14: // add
+      if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_ADD, err ) )
+        return false;
+      break;
+
+    case 0x21: // je
+      if ( !ins_2op_branch ( ins, mem, &addr, INSTRUCTION_NAME_JE, err ) )
+        return false;
+      break;
     case 0x22: // jl
       if ( !ins_2op_branch ( ins, mem, &addr, INSTRUCTION_NAME_JL, err ) )
         return false;
@@ -397,6 +455,15 @@ decode_next_inst (
         return false;
       break;
 
+    case 0x34: // add
+      if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_ADD, err ) )
+        return false;
+      break;
+
+    case 0x41: // je
+      if ( !ins_2op_branch ( ins, mem, &addr, INSTRUCTION_NAME_JE, err ) )
+        return false;
+      break;
     case 0x42: // jl
       if ( !ins_2op_branch ( ins, mem, &addr, INSTRUCTION_NAME_JL, err ) )
         return false;
@@ -406,6 +473,15 @@ decode_next_inst (
         return false;
       break;
 
+    case 0x54: // add
+      if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_ADD, err ) )
+        return false;
+      break;
+
+    case 0x61: // je
+      if ( !ins_2op_branch ( ins, mem, &addr, INSTRUCTION_NAME_JE, err ) )
+        return false;
+      break;
     case 0x62: // jl
       if ( !ins_2op_branch ( ins, mem, &addr, INSTRUCTION_NAME_JL, err ) )
         return false;
@@ -415,6 +491,11 @@ decode_next_inst (
         return false;
       break;
 
+    case 0x74: // add
+      if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_ADD, err ) )
+        return false;
+      break;
+      
     case 0xd5: // sub
       if ( !read_var_ops_store ( ins, mem, &addr, err ) ) return false;
       if ( !ins_var_2ops ( ins, INSTRUCTION_NAME_SUB, err ) ) return false;
@@ -432,7 +513,15 @@ decode_next_inst (
           if ( !ins_call ( ins, mem, err ) ) return false;
         }
       break;
-      
+    case 0xff: // check_arg_count
+      if ( mem->sf_mem[0] >= 5 )
+        {
+          if ( !read_var_ops ( ins, mem, &addr, err ) ) return false;
+          if ( !ins_var_1op ( ins, INSTRUCTION_NAME_CHECK_ARG_COUNT, err ) )
+            return false;
+          if ( !read_branch ( ins, mem, &addr, err ) ) return false;
+        }
+      break;
     default: // Descodifica com UNK
       break;
     }

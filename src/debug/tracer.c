@@ -58,12 +58,15 @@ get_inst_name (
 
   switch ( name )
     {
-    case INSTRUCTION_NAME_CALL: return "call    ";
-    case INSTRUCTION_NAME_JG  : return "jg      ";
-    case INSTRUCTION_NAME_JL  : return "jl      ";
-    case INSTRUCTION_NAME_SUB : return "sub     ";
-    case INSTRUCTION_NAME_UNK :
-    default                   : return "unknown ";
+    case INSTRUCTION_NAME_ADD             : return "add             ";
+    case INSTRUCTION_NAME_CALL            : return "call            ";
+    case INSTRUCTION_NAME_CHECK_ARG_COUNT : return "check_arg_count ";
+    case INSTRUCTION_NAME_JE              : return "je              ";
+    case INSTRUCTION_NAME_JG              : return "jg              ";
+    case INSTRUCTION_NAME_JL              : return "jl              ";
+    case INSTRUCTION_NAME_SUB             : return "sub             ";
+    case INSTRUCTION_NAME_UNK             :
+    default                               : return "unknown         ";
     }
   
 } // end get_inst_name
