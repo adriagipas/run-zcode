@@ -32,6 +32,7 @@
 
 #include "disassembler.h"
 #include "utils/error.h"
+#include "utils/log.h"
 
 
 
@@ -334,6 +335,80 @@ ins_2op_store (
 
 
 static bool
+ins_1op (
+         Instruction            *ins,
+         const MemoryMap        *mem,
+         uint32_t               *addr,
+         const InstructionName   name,
+         char                  **err
+         )
+{
+
+  uint8_t opcode;
+
+  
+  ins->name= name;
+  opcode= ins->bytes[ins->nbytes-1]; // Byte anterior
+  switch ( (opcode>>4)&0x3 )
+    {
+    case 0:
+      if ( !memory_map_READW ( mem, *addr, &(ins->ops[ins->nops].u16),
+                               true, err ) )
+        return false;
+      (*addr)+= 2;
+      ins->ops[ins->nops].type= INSTRUCTION_OP_TYPE_LARGE_CONSTANT;
+      ins->bytes[ins->nbytes++]= (uint8_t) (ins->ops[ins->nops].u16>>8);
+      ins->bytes[ins->nbytes++]= (uint8_t) ins->ops[ins->nops].u16;
+      ++(ins->nops);
+      break;
+    case 1:
+      if ( !memory_map_READB ( mem, *addr, &(ins->ops[ins->nops].u8),
+                               true, err ) )
+        return false;
+      ++(*addr);
+      ins->ops[ins->nops].type= INSTRUCTION_OP_TYPE_SMALL_CONSTANT;
+      ins->bytes[ins->nbytes++]= (uint8_t) ins->ops[ins->nops].u8;
+      ++(ins->nops);
+      break;
+    case 2:
+      if ( !memory_map_READB ( mem, *addr, &(ins->ops[ins->nops].u8),
+                               true, err ) )
+        return false;
+      ++(*addr);
+      set_variable_type ( &(ins->ops[ins->nops]) );
+      ins->bytes[ins->nbytes++]= (uint8_t) ins->ops[ins->nops].u8;
+      ++(ins->nops);
+      break;
+    default:
+      ee ( "disassembler.c - ins_2op - WTF!!" );
+    }
+  
+  return true;
+  
+} // end ins_1op
+
+
+static bool
+ins_1op_branch (
+                Instruction            *ins,
+                const MemoryMap        *mem,
+                uint32_t               *addr,
+                const InstructionName   name,
+                char                  **err
+                )
+{
+
+  if ( !ins_1op ( ins, mem, addr, name, err ) )
+    return false;
+  if ( !read_branch ( ins, mem, addr, err ) )
+    return false;
+
+  return true;
+  
+} // end ins_1op_branch
+
+
+static bool
 ins_call (
           Instruction      *ins,
           const MemoryMap  *mem,
@@ -494,6 +569,26 @@ decode_next_inst (
     case 0x74: // add
       if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_ADD, err ) )
         return false;
+      break;
+
+    case 0x80: // jz
+      if ( !ins_1op_branch ( ins, mem, &addr, INSTRUCTION_NAME_JZ, err ) )
+        return false;
+      break;
+
+    case 0x90: // jz
+      if ( !ins_1op_branch ( ins, mem, &addr, INSTRUCTION_NAME_JZ, err ) )
+        return false;
+      break;
+
+    case 0xa0: // jz
+      if ( !ins_1op_branch ( ins, mem, &addr, INSTRUCTION_NAME_JZ, err ) )
+        return false;
+      break;
+      
+    case 0xc9: // and
+      if ( !read_var_ops_store ( ins, mem, &addr, err ) ) return false;
+      if ( !ins_var_2ops ( ins, INSTRUCTION_NAME_AND, err ) ) return false;
       break;
       
     case 0xd5: // sub

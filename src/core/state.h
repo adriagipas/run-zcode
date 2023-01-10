@@ -70,6 +70,10 @@ struct _State
   uint16_t  stack[STACK_SIZE];  // Pila
   uint16_t  frame;              // Apunta al frame actual en la pila.
   uint16_t  SP;                 // Apunta al següent element lliure.
+  uint16_t  frame_ind;          // Seguint les recomanacions de
+                                // Quetzal, indica el nombre de frames
+                                // actius en la pila. És el que
+                                // utilitzem en catch/throw.
 
   // Camps privats
   const StoryFile *sf;

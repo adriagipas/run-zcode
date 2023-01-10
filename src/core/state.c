@@ -823,7 +823,8 @@ state_new (
   ret->mem= NULL;
   ret->sf= sf;
   ret->tracer= tracer;
-
+  ret->frame_ind= 0;
+  
   // Crea memòria dinàmica.
   version= sf->data[0];
   ret->mem_size= (((uint32_t) sf->data[0xe])<<8) | ((uint32_t) sf->data[0xf]);
@@ -917,6 +918,9 @@ state_new_frame (
 
   // Nou PC
   state->PC= new_PC;
+
+  // Incrementa índex
+  ++(state->frame_ind);
   
   return true;
   
@@ -941,6 +945,8 @@ state_free_frame (
     ;
   state->SP= state->frame;
   state->frame= state->stack[state->frame];
+  assert ( state->frame > 0 );
+  --(state->frame);
   
   return true;
   

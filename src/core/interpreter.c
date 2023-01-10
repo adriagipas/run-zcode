@@ -545,6 +545,27 @@ read_var_ops_store (
 
 
 static bool
+read_op1_var (
+              Interpreter  *intp,
+              uint16_t     *op,
+              char        **err
+              )
+{
+
+  uint8_t tmp;
+
+
+  if ( !memory_map_READB ( intp->mem, intp->state->PC++, &tmp, true, err ) )
+    return false;
+  if ( !read_var ( intp, tmp, op, err ) )
+    return false;
+  
+  return true;
+  
+} // end read_op1_var
+
+
+static bool
 branch (
         Interpreter  *intp,
         const bool    cond,
@@ -710,6 +731,33 @@ exec_next_inst (
       if ( !read_var_var_store ( intp, &op1, &op2, &result_var, err ) )
         return RET_ERROR;
       res= (uint16_t) (((int16_t) op1) + ((int16_t) op2));
+      if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
+      break;
+
+    case 0x80: // jz
+      if ( !memory_map_READW ( intp->mem, state->PC, &op1, true, err ) )
+        return RET_ERROR;
+      state->PC+= 2;
+      if ( !branch ( intp, op1 == 0, err ) ) return RET_ERROR;
+      break;
+
+    case 0x90: // jz
+      if ( !memory_map_READB ( intp->mem, state->PC++, &op1_u8, true, err ) )
+        return RET_ERROR;
+      if ( !branch ( intp, op1_u8 == 0, err ) ) return RET_ERROR;
+      break;
+
+    case 0xa0: // jz
+      if ( !read_op1_var ( intp, &op1, err ) ) return RET_ERROR;
+      if ( !branch ( intp, op1 == 0, err ) ) return RET_ERROR;
+      break;
+      
+    case 0xc9: // and
+      if ( !read_var_ops_store ( intp, ops, &nops, 2, &result_var, err ) )
+        return RET_ERROR;
+      if ( !op_to_u16 ( intp, &(ops[0]), &op1, err ) ) return RET_ERROR;
+      if ( !op_to_u16 ( intp, &(ops[1]), &op2, err ) ) return RET_ERROR;
+      res= op1&op2;
       if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
       break;
       
