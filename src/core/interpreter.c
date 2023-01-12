@@ -610,6 +610,233 @@ branch (
 } // end branch;
 
 
+static bool
+get_object_offset (
+                   Interpreter     *intp,
+                   const uint16_t   object,
+                   uint32_t        *offset,
+                   char           **err
+                   )
+{
+
+  // Comprovacions i obté property pointer
+  if ( intp->version <= 3 )
+    {
+      if ( object < 1 || object > 255 )
+        {
+          msgerror ( err, "Failed to get property address: invalid"
+                     " object index %u", object );
+          return false;
+        }
+      *offset=
+        intp->object_table_offset +
+        31*2 + // Default properties
+        (object-1)*9
+        ;
+    }
+  else
+    {
+      if ( object < 1 )
+        {
+          msgerror ( err, "Failed to get property address: invalid"
+                     " object index %u", object );
+          return false;
+        }
+      *offset=
+        intp->object_table_offset +
+        63*2 + // Default properties
+        (object-1)*14
+        ;
+    }
+
+  return true;
+  
+} // end get_object_offset
+
+
+static bool
+get_prop_addr_len (
+                   Interpreter     *intp,
+                   const uint16_t   object,
+                   const uint16_t   property,
+                   uint16_t        *addr,
+                   uint8_t         *len,
+                   char           **err
+                   )
+{
+
+  uint32_t property_pointer_offset;
+  uint16_t property_pointer,offset;
+  uint8_t text_length,b0,b1,prop_num,prop_len;
+  
+  
+  // Obté property pointer
+  if ( !get_object_offset ( intp, object, &property_pointer_offset, err ) )
+    return false;
+  property_pointer_offset+= (intp->version <= 3) ? 7 : 12;
+  if ( !memory_map_READW ( intp->mem, property_pointer_offset,
+                           &property_pointer, false, err ) )
+    return false;
+
+  // Descarta capçalera.
+  if ( !memory_map_READB ( intp->mem, property_pointer,
+                           &text_length, false, err ) )
+    return false;
+  offset= property_pointer + 1 + ((uint16_t) text_length)*2;
+
+  // Busca propietat
+  if ( intp->version <= 3 )
+    {
+      prop_len= 0;
+      do {
+        offset+= (uint16_t) prop_len;
+        if ( !memory_map_READB ( intp->mem, offset, &b0, false, err ) )
+          return false;
+        prop_num= b0&0x1f;
+        prop_len= (b0>>5)+1;
+        ++offset;
+      } while ( prop_num != 0 && ((uint16_t) prop_num) != property );
+      if ( prop_num == 0 ) *addr= 0;
+      else                 *addr= offset;
+    }
+  else
+    {
+      prop_len= 0;
+      do {
+        offset+= (uint16_t) prop_len;
+        if ( !memory_map_READB ( intp->mem, offset, &b0, false, err ) )
+          return false;
+        if ( b0&0x80 )
+          {
+            if ( !memory_map_READB ( intp->mem, offset, &b1, false, err ) )
+              return false;
+            prop_num= b0&0x3f;
+            prop_len= b1&0x3f;
+            if ( prop_len == 0 ) prop_len= 64;
+            offset+= 2;
+          }
+        else
+          {
+            prop_num= b0&0x3f;
+            prop_len= (b0&0x40)!=0 ? 2 : 1;
+            ++offset;
+          }
+      } while ( prop_num != 0 && ((uint16_t) prop_num) != property );
+      if ( prop_num == 0 ) *addr= 0;
+      else                 *addr= offset;
+    }
+  *len= prop_len;
+  
+  return true;
+  
+} // end get_prop_addr_len
+
+
+static bool
+get_prop_addr (
+               Interpreter     *intp,
+               const uint16_t   object,
+               const uint16_t   property,
+               uint16_t        *addr,
+               char           **err
+               )
+{
+  
+  uint8_t tmp;
+  
+  
+  return get_prop_addr_len ( intp, object, property, addr, &tmp, err );
+  
+} // end get_prop_addr
+
+
+static bool
+get_prop (
+          Interpreter     *intp,
+          const uint16_t   object,
+          const uint16_t   property,
+          uint16_t        *data,
+          char           **err
+          )
+{
+  
+  uint16_t addr;
+  uint8_t len,tmp;
+  
+
+  // Obté adreça i longitut
+  if ( !get_prop_addr_len ( intp, object, property, &addr, &len, err ) )
+    return false;
+
+  // Obté contingut
+  if ( len == 1 )
+    {
+      if ( !memory_map_READB ( intp->mem, (uint32_t) addr, &tmp, false, err ) )
+        return false;
+      *data= (uint16_t) tmp;
+    }
+  else if ( len == 2 )
+    {
+      if ( !memory_map_READW ( intp->mem, (uint32_t) addr, data, false, err ) )
+        return false;
+    }
+  else
+    {
+      msgerror ( err, "Failed to get property data: unable to"
+                 " read property of length %u", len );
+      return false;
+    }
+  
+  return true;
+  
+} // end get_prop_addr
+
+
+static bool
+jin (
+     Interpreter     *intp,
+     const uint16_t   a,
+     const uint16_t   b,
+     char           **err
+     )
+{
+
+  uint32_t parent_offset;
+  uint16_t parent_u16;
+  uint8_t parent_u8;
+  bool is_parent;
+  
+  
+  // Obté property pointer
+  if ( !get_object_offset ( intp, a, &parent_offset, err ) )
+    return false;
+
+  // Llig parent
+  if ( intp->version <= 3 )
+    {
+      parent_offset+= 4;
+      if ( !memory_map_READB ( intp->mem, parent_offset,
+                               &parent_u8, false, err ) )
+        return false;
+      is_parent= (((uint16_t) parent_u8) == b);
+    }
+  else
+    {
+      parent_offset+= 6;
+      if ( !memory_map_READW ( intp->mem, parent_offset,
+                               &parent_u16, false, err ) )
+        return false;
+      is_parent= (parent_u16 == b);
+    }
+
+  // Bota.
+  if ( !branch ( intp, is_parent, err ) ) return false;
+  
+  return true;
+  
+} // end jin
+
+
 static int
 exec_next_inst (
                 Interpreter  *intp,
@@ -651,6 +878,40 @@ exec_next_inst (
         return RET_ERROR;
       break;
 
+    case 0x06: // jin
+      if ( !read_small_small ( intp, &op1_u8, &op2_u8, err ) ) return RET_ERROR;
+      SET_U8TOU16(op1_u8,op1);
+      SET_U8TOU16(op2_u8,op2);
+      if ( !jin ( intp, op1, op2, err ) ) return RET_ERROR;
+      break;
+
+    case 0x0f: // loadw
+      if ( !read_small_small_store ( intp, &op1_u8, &op2_u8, &result_var, err ))
+        return RET_ERROR;
+      SET_U8TOU16(op1_u8,op1);
+      SET_U8TOU16(op2_u8,op2);
+      if ( !memory_map_READW ( intp->mem, op1 + 2*op2, &res, false, err ) )
+        return RET_ERROR;
+      if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
+      break;
+      
+    case 0x11: // get_prop
+      if ( !read_small_small_store ( intp, &op1_u8, &op2_u8, &result_var, err ))
+        return RET_ERROR;
+      SET_U8TOU16(op1_u8,op1);
+      SET_U8TOU16(op2_u8,op2);
+      if ( !get_prop ( intp, op1, op2, &res, err ) ) return RET_ERROR;
+      if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
+      break;
+    case 0x12: // get_prop_addr
+      if ( !read_small_small_store ( intp, &op1_u8, &op2_u8, &result_var, err ))
+        return RET_ERROR;
+      SET_U8TOU16(op1_u8,op1);
+      SET_U8TOU16(op2_u8,op2);
+      if ( !get_prop_addr ( intp, op1, op2, &res, err ) ) return RET_ERROR;
+      if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
+      break;
+      
     case 0x14: // add
       if ( !read_small_small_store ( intp, &op1_u8, &op2_u8, &result_var, err ))
         return RET_ERROR;
@@ -678,6 +939,36 @@ exec_next_inst (
         return RET_ERROR;
       break;
 
+    case 0x26: // jin
+      if ( !read_small_var ( intp, &op1_u8, &op2, err ) ) return RET_ERROR;
+      SET_U8TOU16(op1_u8,op1);
+      if ( !jin ( intp, op1, op2, err ) ) return RET_ERROR;
+      break;
+
+    case 0x2f: // loadw
+      if ( !read_small_var_store ( intp, &op1_u8, &op2, &result_var, err ) )
+        return RET_ERROR;
+      SET_U8TOU16(op1_u8,op1);
+      if ( !memory_map_READW ( intp->mem, op1 + 2*op2, &res, false, err ) )
+        return RET_ERROR;
+      if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
+      break;
+      
+    case 0x31: // get_prop
+      if ( !read_small_var_store ( intp, &op1_u8, &op2, &result_var, err ) )
+        return RET_ERROR;
+      SET_U8TOU16(op1_u8,op1);
+      if ( !get_prop ( intp, op1, op2, &res, err ) ) return RET_ERROR;
+      if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
+      break;
+    case 0x32: // get_prop_addr
+      if ( !read_small_var_store ( intp, &op1_u8, &op2, &result_var, err ) )
+        return RET_ERROR;
+      SET_U8TOU16(op1_u8,op1);
+      if ( !get_prop_addr ( intp, op1, op2, &res, err ) ) return RET_ERROR;
+      if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
+      break;
+      
     case 0x34: // add
       if ( !read_small_var_store ( intp, &op1_u8, &op2, &result_var, err ) )
         return RET_ERROR;
@@ -704,6 +995,36 @@ exec_next_inst (
         return RET_ERROR;
       break;
 
+    case 0x46: // jin
+      if ( !read_var_small ( intp, &op1, &op2_u8, err ) ) return RET_ERROR;
+      SET_U8TOU16(op2_u8,op2);
+      if ( !jin ( intp, op1, op2, err ) ) return RET_ERROR;
+      break;
+
+    case 0x4f: // loadw
+      if ( !read_var_small_store ( intp, &op1, &op2_u8, &result_var, err ) )
+        return RET_ERROR;
+      SET_U8TOU16(op2_u8,op2);
+      if ( !memory_map_READW ( intp->mem, op1 + 2*op2, &res, false, err ) )
+        return RET_ERROR;
+      if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
+      break;
+      
+    case 0x51: // get_prop
+      if ( !read_var_small_store ( intp, &op1, &op2_u8, &result_var, err ) )
+        return RET_ERROR;
+      SET_U8TOU16(op2_u8,op2);
+      if ( !get_prop ( intp, op1, op2, &res, err ) ) return RET_ERROR;
+      if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
+      break;
+    case 0x52: // get_prop_addr
+      if ( !read_var_small_store ( intp, &op1, &op2_u8, &result_var, err ) )
+        return RET_ERROR;
+      SET_U8TOU16(op2_u8,op2);
+      if ( !get_prop_addr ( intp, op1, op2, &res, err ) ) return RET_ERROR;
+      if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
+      break;
+      
     case 0x54: // add
       if ( !read_var_small_store ( intp, &op1, &op2_u8, &result_var, err ) )
         return RET_ERROR;
@@ -727,6 +1048,32 @@ exec_next_inst (
         return RET_ERROR;
       break;
 
+    case 0x66: // jin
+      if ( !read_var_var ( intp, &op1, &op2, err ) ) return RET_ERROR;
+      if ( !jin ( intp, op1, op2, err ) ) return RET_ERROR;
+      break;
+
+    case 0x6f: // loadw
+      if ( !read_var_var_store ( intp, &op1, &op2, &result_var, err ) )
+        return RET_ERROR;
+      if ( !memory_map_READW ( intp->mem, op1 + 2*op2, &res, false, err ) )
+        return RET_ERROR;
+      if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
+      break;
+      
+    case 0x71: // get_prop
+      if ( !read_var_var_store ( intp, &op1, &op2, &result_var, err ) )
+        return RET_ERROR;
+      if ( !get_prop ( intp, op1, op2, &res, err ) ) return RET_ERROR;
+      if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
+      break;
+    case 0x72: // get_prop_addr
+      if ( !read_var_var_store ( intp, &op1, &op2, &result_var, err ) )
+        return RET_ERROR;
+      if ( !get_prop_addr ( intp, op1, op2, &res, err ) ) return RET_ERROR;
+      if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
+      break;
+      
     case 0x74: // add
       if ( !read_var_var_store ( intp, &op1, &op2, &result_var, err ) )
         return RET_ERROR;
@@ -872,6 +1219,10 @@ interpreter_new_from_file_name (
         ((uint32_t) ret->mem->sf_mem[0x2b])
         ;
     }
+  ret->object_table_offset=
+    (((uint32_t) ret->mem->sf_mem[0xa])<<8) |
+    ((uint32_t) ret->mem->sf_mem[0xb])
+    ;
   
   return ret;
 

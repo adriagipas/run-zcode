@@ -49,6 +49,7 @@ typedef struct
   uint8_t version;
   uint32_t routine_offset;
   uint32_t static_strings_offset;
+  uint32_t object_table_offset;
   
 } Interpreter;
 

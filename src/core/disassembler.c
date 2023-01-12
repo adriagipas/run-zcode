@@ -512,6 +512,26 @@ decode_next_inst (
         return false;
       break;
 
+    case 0x06: // jin
+      if ( !ins_2op_branch ( ins, mem, &addr, INSTRUCTION_NAME_JIN, err ) )
+        return false;
+      break;
+
+    case 0x0f: // loadw
+      if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_LOADW, err ) )
+        return false;
+      break;
+      
+    case 0x11: // get_prop
+      if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_GET_PROP, err ) )
+        return false;
+      break;
+    case 0x12: // get_prop_addr
+      if ( !ins_2op_store ( ins, mem, &addr,
+                            INSTRUCTION_NAME_GET_PROP_ADDR, err ) )
+        return false;
+      break;
+      
     case 0x14: // add
       if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_ADD, err ) )
         return false;
@@ -530,6 +550,26 @@ decode_next_inst (
         return false;
       break;
 
+    case 0x26: // jin
+      if ( !ins_2op_branch ( ins, mem, &addr, INSTRUCTION_NAME_JIN, err ) )
+        return false;
+      break;
+      
+    case 0x2f: // loadw
+      if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_LOADW, err ) )
+        return false;
+      break;
+      
+    case 0x31: // get_prop
+      if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_GET_PROP, err ) )
+        return false;
+      break;
+    case 0x32: // get_prop_addr
+      if ( !ins_2op_store ( ins, mem, &addr,
+                            INSTRUCTION_NAME_GET_PROP_ADDR, err ) )
+        return false;
+      break;
+      
     case 0x34: // add
       if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_ADD, err ) )
         return false;
@@ -548,6 +588,26 @@ decode_next_inst (
         return false;
       break;
 
+    case 0x46: // jin
+      if ( !ins_2op_branch ( ins, mem, &addr, INSTRUCTION_NAME_JIN, err ) )
+        return false;
+      break;
+
+    case 0x4f: // loadw
+      if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_LOADW, err ) )
+        return false;
+      break;
+      
+    case 0x51: // get_prop
+      if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_GET_PROP, err ) )
+        return false;
+      break;
+    case 0x52: // get_prop_addr
+      if ( !ins_2op_store ( ins, mem, &addr,
+                            INSTRUCTION_NAME_GET_PROP_ADDR, err ) )
+        return false;
+      break;
+      
     case 0x54: // add
       if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_ADD, err ) )
         return false;
@@ -566,6 +626,26 @@ decode_next_inst (
         return false;
       break;
 
+    case 0x66: // jin
+      if ( !ins_2op_branch ( ins, mem, &addr, INSTRUCTION_NAME_JIN, err ) )
+        return false;
+      break;
+
+    case 0x6f: // loadw
+      if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_LOADW, err ) )
+        return false;
+      break;
+      
+    case 0x71: // get_prop
+      if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_GET_PROP, err ) )
+        return false;
+      break;
+    case 0x72: // get_prop_addr
+      if ( !ins_2op_store ( ins, mem, &addr,
+                            INSTRUCTION_NAME_GET_PROP_ADDR, err ) )
+        return false;
+      break;
+      
     case 0x74: // add
       if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_ADD, err ) )
         return false;

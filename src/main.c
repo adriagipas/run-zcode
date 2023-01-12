@@ -166,7 +166,7 @@ int main ( int argc, char *argv[] )
       intp= interpreter_new_from_file_name
         ( args.zcode_fn, TRACER(tracer), &err );
       if ( intp == NULL ) ee ( err );
-      if ( !interpreter_trace ( intp, 20, &err ) )
+      if ( !interpreter_trace ( intp, 30, &err ) )
         ee ( err );
       interpreter_free ( intp );
       debug_tracer_free ( tracer );
