@@ -55,6 +55,9 @@
            __LINE__ );                                                  \
   }
 
+#define U16_S32(U16) ((int32_t) ((int16_t) (U16)))
+#define S32_U16(S32) ((uint16_t) ((uint32_t) (S32)))
+
 
 
 
@@ -202,6 +205,38 @@ op_to_u16 (
 } // end op_to_u16
 
 
+static bool
+op_to_refvar (
+              Interpreter      *intp,
+              const operand_t  *op,
+              uint8_t          *ref,
+              char            **err
+              )
+{
+
+  switch ( op->type )
+    {
+    case OP_LARGE:
+      msgerror ( err, "Trying to reference a variable with a large constant" );
+      return false;
+    case OP_SMALL:
+      *ref= op->u8.val;
+      break;
+    case OP_VARIABLE:
+      // NOTA!! Açò és possible??????????
+      msgerror ( err, "Trying to reference a variable with a variable" );
+      return false;
+      //*ref= op->u8.val;
+      //break;
+    default:
+      ee ( "interpreter.c - op_to_u16 - WTF!!" );
+    }
+
+  return true;
+  
+} // op_to_refvar
+
+
 // NOTA!! S'espera sempre que el primer argument siga la rutina però
 // no s'ha comprovat res.
 static bool
@@ -217,7 +252,7 @@ call_routine (
 
   uint32_t addr;
   uint8_t num_local_vars,n,args_mask;
-  uint16_t local_vars[15];
+  uint16_t local_vars[15],paddr;
   int i;
   
   
@@ -227,16 +262,20 @@ call_routine (
       msgerror ( err, "Failed to call routine: missing routine argument" );
       return false;
     }
-  if ( ops[0].type != OP_LARGE )
+  if ( ops[0].type != OP_LARGE && ops[0].type != OP_VARIABLE )
     {
       msgerror ( err, "Failed to call routine: invalid operand"
                  " type for routine argument" );
       return false;
     }
 
+  // Obté paràmetre routine.
+  if ( !op_to_u16 ( intp, &(ops[0]), &paddr, err ) )
+    return false;
+  
   // Descodifica rutina.
   // --> Adreça real
-  addr= unpack_addr ( intp, ops[0].u16.val, true );
+  addr= unpack_addr ( intp, paddr, true );
   // --> Nombre variables locals
   if ( !memory_map_READB ( intp->mem, addr++,
                            &num_local_vars, true, err ) )
@@ -566,6 +605,67 @@ read_op1_var (
 
 
 static bool
+read_op1_large_store (
+                      Interpreter  *intp,
+                      uint16_t     *op,
+                      uint8_t      *store_var,
+                      char        **err
+                      )
+{
+  
+  if ( !memory_map_READW ( intp->mem, intp->state->PC, op, true, err ) )
+    return false;
+  intp->state->PC+= 2;
+  if ( !memory_map_READB ( intp->mem, intp->state->PC++,
+                           store_var, true, err ) )
+    return false;
+  
+  return true;
+  
+} // end read_op1_large_store
+
+
+static bool
+read_op1_small_store (
+                      Interpreter  *intp,
+                      uint8_t      *op,
+                      uint8_t      *store_var,
+                      char        **err
+                      )
+{
+  
+  if ( !memory_map_READB ( intp->mem, intp->state->PC++, op, true, err ) )
+    return false;
+  if ( !memory_map_READB ( intp->mem, intp->state->PC++,
+                           store_var, true, err ) )
+    return false;
+  
+  return true;
+  
+} // end read_op1_small_store
+
+
+static bool
+read_op1_var_store (
+                    Interpreter  *intp,
+                    uint16_t     *op,
+                    uint8_t      *store_var,
+                    char        **err
+                    )
+{
+  
+  if ( !read_op1_var ( intp, op, err ) )
+    return false;
+  if ( !memory_map_READB ( intp->mem, intp->state->PC++,
+                           store_var, true, err ) )
+    return false;
+  
+  return true;
+  
+} // end read_op1_var_store
+
+
+static bool
 branch (
         Interpreter  *intp,
         const bool    cond,
@@ -789,7 +889,49 @@ get_prop (
   
   return true;
   
-} // end get_prop_addr
+} // end get_prop
+
+
+static bool
+put_prop (
+          Interpreter     *intp,
+          const uint16_t   object,
+          const uint16_t   property,
+          const uint16_t   data,
+          char           **err
+          )
+{
+  
+  uint16_t addr;
+  uint8_t len;
+  
+  
+  // Obté adreça i longitut
+  if ( !get_prop_addr_len ( intp, object, property, &addr, &len, err ) )
+    return false;
+
+  // Obté contingut
+  if ( len == 1 )
+    {
+      if ( !memory_map_WRITEB ( intp->mem, (uint32_t) addr,
+                                (uint8_t) data, false, err ) )
+        return false;
+    }
+  else if ( len == 2 )
+    {
+      if ( !memory_map_WRITEW ( intp->mem, (uint32_t) addr, data, false, err ) )
+        return false;
+    }
+  else
+    {
+      msgerror ( err, "Failed to put property data: unable to"
+                 " write property of length %u", len );
+      return false;
+    }
+  
+  return true;
+  
+} // end put_prop
 
 
 static bool
@@ -837,6 +979,33 @@ jin (
 } // end jin
 
 
+static bool
+ret_val (
+         Interpreter     *intp,
+         const uint16_t   val,
+         char           **err
+         )
+{
+
+  bool discard;
+  uint8_t res_var;
+  
+  
+  discard= FRAME_DISCARD_RES(intp->state);
+  res_var= (uint8_t) FRAME_NUM_RES(intp->state);
+  if ( !state_free_frame ( intp->state, err ) )
+    return false;
+  if ( !discard )
+    {
+      if ( !state_writevar ( intp->state, res_var, val, err ) )
+        return false;
+    }
+  
+  return true;
+  
+} // end ret_val
+
+
 static int
 exec_next_inst (
                 Interpreter  *intp,
@@ -844,13 +1013,14 @@ exec_next_inst (
                 )
 {
 
-  int nops;
-  uint8_t opcode,result_var,op1_u8,op2_u8;
-  uint16_t op1,op2,res;
+  int nops,n;
+  uint8_t opcode,result_var,op1_u8,op2_u8,res_u8;
+  uint16_t op1,op2,op3,res,tmp16;
   State *state;
   operand_t ops[8];
+  bool cond;
   
-
+  
   state= intp->state;
   if ( !memory_map_READB ( intp->mem, state->PC++, &opcode, true, err ) )
     return RET_ERROR;
@@ -885,6 +1055,31 @@ exec_next_inst (
       if ( !jin ( intp, op1, op2, err ) ) return RET_ERROR;
       break;
 
+    case 0x08: // or
+      if ( !read_small_small_store ( intp, &op1_u8, &op2_u8, &result_var, err ))
+        return RET_ERROR;
+      SET_U8TOU16(op1_u8,op1);
+      SET_U8TOU16(op2_u8,op2);
+      res= op1 | op2;
+      if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
+      break;
+    case 0x09: // and
+      if ( !read_small_small_store ( intp, &op1_u8, &op2_u8, &result_var, err ))
+        return RET_ERROR;
+      SET_U8TOU16(op1_u8,op1);
+      SET_U8TOU16(op2_u8,op2);
+      res= op1 & op2;
+      if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
+      break;
+      
+    case 0x0d: // store
+      if ( !read_small_small ( intp, &op1_u8, &op2_u8, err ) ) return RET_ERROR;
+      SET_U8TOU16(op2_u8,op2);
+      if ( op1_u8 == 0x00 ) // Si es desa en la pila descarte anterior
+        { if ( !read_var ( intp, 0, &tmp16, err ) ) return RET_ERROR; }
+      if ( !write_var ( intp, op1_u8, op2, err ) ) return RET_ERROR;
+      break;
+      
     case 0x0f: // loadw
       if ( !read_small_small_store ( intp, &op1_u8, &op2_u8, &result_var, err ))
         return RET_ERROR;
@@ -894,7 +1089,16 @@ exec_next_inst (
         return RET_ERROR;
       if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
       break;
-      
+    case 0x10: // loadb
+      if ( !read_small_small_store ( intp, &op1_u8, &op2_u8, &result_var, err ))
+        return RET_ERROR;
+      SET_U8TOU16(op1_u8,op1);
+      SET_U8TOU16(op2_u8,op2);
+      if ( !memory_map_READB ( intp->mem, op1 + op2, &res_u8, false, err ) )
+        return RET_ERROR;
+      SET_U8TOU16(res_u8,res);
+      if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
+      break;
     case 0x11: // get_prop
       if ( !read_small_small_store ( intp, &op1_u8, &op2_u8, &result_var, err ))
         return RET_ERROR;
@@ -918,6 +1122,40 @@ exec_next_inst (
       SET_U8TOU16(op1_u8,op1);
       SET_U8TOU16(op2_u8,op2);
       res= (uint16_t) (((int16_t) op1) + ((int16_t) op2));
+      if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
+      break;
+    case 0x15: // sub
+      if ( !read_small_small_store ( intp, &op1_u8, &op2_u8, &result_var, err ))
+        return RET_ERROR;
+      SET_U8TOU16(op1_u8,op1);
+      SET_U8TOU16(op2_u8,op2);
+      res= (uint16_t) (((int16_t) op1) - ((int16_t) op2));
+      if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
+      break;
+    case 0x16: // mul
+      if ( !read_small_small_store ( intp, &op1_u8, &op2_u8, &result_var, err ))
+        return RET_ERROR;
+      SET_U8TOU16(op1_u8,op1);
+      SET_U8TOU16(op2_u8,op2);
+      res= S32_U16(U16_S32(op1) * U16_S32(op2));
+      if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
+      break;
+    case 0x17: // div
+      if ( !read_small_small_store ( intp, &op1_u8, &op2_u8, &result_var, err ))
+        return RET_ERROR;
+      SET_U8TOU16(op1_u8,op1);
+      SET_U8TOU16(op2_u8,op2);
+      if ( op2 == 0 ) goto division0;
+      res= (uint16_t) (((int16_t) op1) / ((int16_t) op2));
+      if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
+      break;
+    case 0x18: // mod
+      if ( !read_small_small_store ( intp, &op1_u8, &op2_u8, &result_var, err ))
+        return RET_ERROR;
+      SET_U8TOU16(op1_u8,op1);
+      SET_U8TOU16(op2_u8,op2);
+      if ( op2 == 0 ) goto division0;
+      res= (uint16_t) (((int16_t) op1) % ((int16_t) op2));
       if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
       break;
 
@@ -944,6 +1182,28 @@ exec_next_inst (
       SET_U8TOU16(op1_u8,op1);
       if ( !jin ( intp, op1, op2, err ) ) return RET_ERROR;
       break;
+      
+    case 0x28: // or
+      if ( !read_small_var_store ( intp, &op1_u8, &op2, &result_var, err ) )
+        return RET_ERROR;
+      SET_U8TOU16(op1_u8,op1);
+      res= op1 | op2;
+      if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
+      break;
+    case 0x29: // and
+      if ( !read_small_var_store ( intp, &op1_u8, &op2, &result_var, err ) )
+        return RET_ERROR;
+      SET_U8TOU16(op1_u8,op1);
+      res= op1 & op2;
+      if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
+      break;
+      
+    case 0x2d: // store
+      if ( !read_small_var ( intp, &op1_u8, &op2, err ) ) return RET_ERROR;
+      if ( op1_u8 == 0x00 ) // Si es desa en la pila descarte anterior
+        { if ( !read_var ( intp, 0, &tmp16, err ) ) return RET_ERROR; }
+      if ( !write_var ( intp, op1_u8, op2, err ) ) return RET_ERROR;
+      break;
 
     case 0x2f: // loadw
       if ( !read_small_var_store ( intp, &op1_u8, &op2, &result_var, err ) )
@@ -953,7 +1213,15 @@ exec_next_inst (
         return RET_ERROR;
       if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
       break;
-      
+    case 0x30: // loadb
+      if ( !read_small_var_store ( intp, &op1_u8, &op2, &result_var, err ) )
+        return RET_ERROR;
+      SET_U8TOU16(op1_u8,op1);
+      if ( !memory_map_READB ( intp->mem, op1 + op2, &res_u8, false, err ) )
+        return RET_ERROR;
+      SET_U8TOU16(res_u8,res);
+      if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
+      break;
     case 0x31: // get_prop
       if ( !read_small_var_store ( intp, &op1_u8, &op2, &result_var, err ) )
         return RET_ERROR;
@@ -974,6 +1242,36 @@ exec_next_inst (
         return RET_ERROR;
       SET_U8TOU16(op1_u8,op1);
       res= (uint16_t) (((int16_t) op1) + ((int16_t) op2));
+      if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
+      break;
+    case 0x35: // sub
+      if ( !read_small_var_store ( intp, &op1_u8, &op2, &result_var, err ) )
+        return RET_ERROR;
+      SET_U8TOU16(op1_u8,op1);
+      res= (uint16_t) (((int16_t) op1) - ((int16_t) op2));
+      if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
+      break;
+    case 0x36: // mul
+      if ( !read_small_var_store ( intp, &op1_u8, &op2, &result_var, err ) )
+        return RET_ERROR;
+      SET_U8TOU16(op1_u8,op1);
+      res= S32_U16(U16_S32(op1) * U16_S32(op2));
+      if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
+      break;
+    case 0x37: // div
+      if ( !read_small_var_store ( intp, &op1_u8, &op2, &result_var, err ) )
+        return RET_ERROR;
+      SET_U8TOU16(op1_u8,op1);
+      if ( op2 == 0 ) goto division0;
+      res= (uint16_t) (((int16_t) op1) / ((int16_t) op2));
+      if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
+      break;
+    case 0x38: // mod
+      if ( !read_small_var_store ( intp, &op1_u8, &op2, &result_var, err ) )
+        return RET_ERROR;
+      SET_U8TOU16(op1_u8,op1);
+      if ( op2 == 0 ) goto division0;
+      res= (uint16_t) (((int16_t) op1) % ((int16_t) op2));
       if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
       break;
 
@@ -1000,6 +1298,29 @@ exec_next_inst (
       SET_U8TOU16(op2_u8,op2);
       if ( !jin ( intp, op1, op2, err ) ) return RET_ERROR;
       break;
+      
+    case 0x48: // or
+      if ( !read_var_small_store ( intp, &op1, &op2_u8, &result_var, err ) )
+        return RET_ERROR;
+      SET_U8TOU16(op2_u8,op2);
+      res= op1 | op2;
+      if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
+      break;
+    case 0x49: // and
+      if ( !read_var_small_store ( intp, &op1, &op2_u8, &result_var, err ) )
+        return RET_ERROR;
+      SET_U8TOU16(op2_u8,op2);
+      res= op1 & op2;
+      if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
+      break;
+      
+    case 0x4d: // store
+      if ( !read_small_small ( intp, &op1_u8, &op2_u8, err ) ) return RET_ERROR;
+      SET_U8TOU16(op2_u8,op2);
+      if ( op1_u8 == 0x00 ) // Si es desa en la pila descarte anterior
+        { if ( !read_var ( intp, 0, &tmp16, err ) ) return RET_ERROR; }
+      if ( !write_var ( intp, op1_u8, op2, err ) ) return RET_ERROR;
+      break;
 
     case 0x4f: // loadw
       if ( !read_var_small_store ( intp, &op1, &op2_u8, &result_var, err ) )
@@ -1009,7 +1330,15 @@ exec_next_inst (
         return RET_ERROR;
       if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
       break;
-      
+    case 0x50: // loadb
+      if ( !read_var_small_store ( intp, &op1, &op2_u8, &result_var, err ) )
+        return RET_ERROR;
+      SET_U8TOU16(op2_u8,op2);
+      if ( !memory_map_READB ( intp->mem, op1 + op2, &res_u8, false, err ) )
+        return RET_ERROR;
+      SET_U8TOU16(res_u8,res);
+      if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
+      break;
     case 0x51: // get_prop
       if ( !read_var_small_store ( intp, &op1, &op2_u8, &result_var, err ) )
         return RET_ERROR;
@@ -1030,6 +1359,36 @@ exec_next_inst (
         return RET_ERROR;
       SET_U8TOU16(op2_u8,op2);
       res= (uint16_t) (((int16_t) op1) + ((int16_t) op2));
+      if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
+      break;
+    case 0x55: // sub
+      if ( !read_var_small_store ( intp, &op1, &op2_u8, &result_var, err ) )
+        return RET_ERROR;
+      SET_U8TOU16(op2_u8,op2);
+      res= (uint16_t) (((int16_t) op1) - ((int16_t) op2));
+      if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
+      break;
+    case 0x56: // mul
+      if ( !read_var_small_store ( intp, &op1, &op2_u8, &result_var, err ) )
+        return RET_ERROR;
+      SET_U8TOU16(op2_u8,op2);
+      res= S32_U16(U16_S32(op1) * U16_S32(op2));
+      if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
+      break;
+    case 0x57: // div
+      if ( !read_var_small_store ( intp, &op1, &op2_u8, &result_var, err ) )
+        return RET_ERROR;
+      SET_U8TOU16(op2_u8,op2);
+      if ( op2 == 0 ) goto division0;
+      res= (uint16_t) (((int16_t) op1) / ((int16_t) op2));
+      if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
+      break;
+    case 0x58: // mod
+      if ( !read_var_small_store ( intp, &op1, &op2_u8, &result_var, err ) )
+        return RET_ERROR;
+      SET_U8TOU16(op2_u8,op2);
+      if ( op2 == 0 ) goto division0;
+      res= (uint16_t) (((int16_t) op1) % ((int16_t) op2));
       if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
       break;
 
@@ -1053,6 +1412,26 @@ exec_next_inst (
       if ( !jin ( intp, op1, op2, err ) ) return RET_ERROR;
       break;
 
+    case 0x68: // or
+      if ( !read_var_var_store ( intp, &op1, &op2, &result_var, err ) )
+        return RET_ERROR;
+      res= op1 | op2;
+      if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
+      break;
+    case 0x69: // and
+      if ( !read_var_var_store ( intp, &op1, &op2, &result_var, err ) )
+        return RET_ERROR;
+      res= op1 & op2;
+      if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
+      break;
+      
+    case 0x6d: // store
+      if ( !read_small_var ( intp, &op1_u8, &op2, err ) ) return RET_ERROR;
+      if ( op1_u8 == 0x00 ) // Si es desa en la pila descarte anterior
+        { if ( !read_var ( intp, 0, &tmp16, err ) ) return RET_ERROR; }
+      if ( !write_var ( intp, op1_u8, op2, err ) ) return RET_ERROR;
+      break;
+
     case 0x6f: // loadw
       if ( !read_var_var_store ( intp, &op1, &op2, &result_var, err ) )
         return RET_ERROR;
@@ -1060,7 +1439,14 @@ exec_next_inst (
         return RET_ERROR;
       if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
       break;
-      
+    case 0x70: // loadb
+      if ( !read_var_var_store ( intp, &op1, &op2, &result_var, err ) )
+        return RET_ERROR;
+      if ( !memory_map_READB ( intp->mem, op1 + op2, &res_u8, false, err ) )
+        return RET_ERROR;
+      SET_U8TOU16(res_u8,res);
+      if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
+      break;
     case 0x71: // get_prop
       if ( !read_var_var_store ( intp, &op1, &op2, &result_var, err ) )
         return RET_ERROR;
@@ -1080,12 +1466,65 @@ exec_next_inst (
       res= (uint16_t) (((int16_t) op1) + ((int16_t) op2));
       if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
       break;
-
+    case 0x75: // sub
+      if ( !read_var_var_store ( intp, &op1, &op2, &result_var, err ) )
+        return RET_ERROR;
+      res= (uint16_t) (((int16_t) op1) - ((int16_t) op2));
+      if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
+      break;
+    case 0x76: // mul
+      if ( !read_var_var_store ( intp, &op1, &op2, &result_var, err ) )
+        return RET_ERROR;
+      res= S32_U16(U16_S32(op1) * U16_S32(op2));
+      if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
+      break;
+    case 0x77: // div
+      if ( !read_var_var_store ( intp, &op1, &op2, &result_var, err ) )
+        return RET_ERROR;
+      if ( op2 == 0 ) goto division0;
+      res= (uint16_t) (((int16_t) op1) / ((int16_t) op2));
+      if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
+      break;
+    case 0x78: // mod
+      if ( !read_var_var_store ( intp, &op1, &op2, &result_var, err ) )
+        return RET_ERROR;
+      if ( op2 == 0 ) goto division0;
+      res= (uint16_t) (((int16_t) op1) % ((int16_t) op2));
+      if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
+      break;
+      
     case 0x80: // jz
       if ( !memory_map_READW ( intp->mem, state->PC, &op1, true, err ) )
         return RET_ERROR;
       state->PC+= 2;
       if ( !branch ( intp, op1 == 0, err ) ) return RET_ERROR;
+      break;
+
+    case 0x85: // inc
+      msgerror ( err, "Failed to execute @inc: Trying to reference"
+                 " a variable with a large constant" );
+      return RET_ERROR;
+      break;
+
+    case 0x88: // call_1s
+      if ( intp->version < 4 ) goto wrong_version;
+      ops[0].u16.type= OP_LARGE;
+      if ( !read_op1_large_store ( intp, &(ops[0].u16.val), &result_var, err ) )
+        return RET_ERROR;
+      if ( !call_routine ( intp, ops, 1, result_var, false, err ) )
+        return RET_ERROR;
+      break;
+      
+    case 0x8b: // ret
+      if ( !memory_map_READW ( intp->mem, state->PC, &op1, true, err ) )
+        return RET_ERROR;
+      state->PC+= 2;
+      if ( !ret_val ( intp, op1, err ) ) return RET_ERROR;
+      break;
+    case 0x8c: // jump
+      if ( !memory_map_READW ( intp->mem, state->PC, &op1, true, err ) )
+        return RET_ERROR;
+      state->PC+= (uint32_t) U16_S32(op1);
       break;
 
     case 0x90: // jz
@@ -1094,9 +1533,89 @@ exec_next_inst (
       if ( !branch ( intp, op1_u8 == 0, err ) ) return RET_ERROR;
       break;
 
+    case 0x95: // inc
+      if ( !memory_map_READB ( intp->mem, state->PC++, &op1_u8, true, err ) )
+        return RET_ERROR;
+      if ( !read_var ( intp, op1_u8, &op1, err ) ) return RET_ERROR;
+      ++op1;
+      if ( !write_var ( intp, op1_u8, op1, err ) ) return RET_ERROR;
+      break;
+      
+    case 0x98: // call_1s
+      if ( intp->version < 4 ) goto wrong_version;
+      ops[0].u8.type= OP_SMALL;
+      if ( !read_op1_small_store ( intp, &(ops[0].u8.val), &result_var, err ) )
+        return RET_ERROR;
+      if ( !call_routine ( intp, ops, 1, result_var, false, err ) )
+        return RET_ERROR;
+      break;
+      
+    case 0x9b: // ret
+      if ( !memory_map_READB ( intp->mem, state->PC++, &op1_u8, true, err ) )
+        return RET_ERROR;
+      SET_U8TOU16(op1_u8,op1);
+      if ( !ret_val ( intp, op1, err ) ) return RET_ERROR;
+      break;
+    case 0x9c: // jump
+      if ( !memory_map_READB ( intp->mem, state->PC++, &op1_u8, true, err ) )
+        return RET_ERROR;
+      SET_U8TOU16(op1_u8,op1);
+      state->PC+= ((uint32_t) U16_S32(op1))-2;
+      break;
+      
     case 0xa0: // jz
       if ( !read_op1_var ( intp, &op1, err ) ) return RET_ERROR;
       if ( !branch ( intp, op1 == 0, err ) ) return RET_ERROR;
+      break;
+
+    case 0xa5: // inc. NOTA!! Açò és possible?
+      msgerror ( err, "Failed to execute @inc: Trying to reference"
+                 " a variable with a variable" );
+      return RET_ERROR;
+      break;
+      
+    case 0xa8: // call_1s
+      if ( intp->version < 4 ) goto wrong_version;
+      ops[0].u8.type= OP_VARIABLE;
+      if ( !read_op1_small_store ( intp, &(ops[0].u8.val), &result_var, err ) )
+        return RET_ERROR;
+      if ( !call_routine ( intp, ops, 1, result_var, false, err ) )
+        return RET_ERROR;
+      break;
+      
+    case 0xab: // ret
+      if ( !read_op1_var ( intp, &op1, err ) ) return RET_ERROR;
+      if ( !ret_val ( intp, op1, err ) ) return RET_ERROR;
+      break;
+    case 0xac: // jump
+      if ( !read_op1_var ( intp, &op1, err ) ) return RET_ERROR;
+      state->PC+= ((uint32_t) U16_S32(op1))-2;
+      break;
+
+    case 0xb0: // rtrue
+      if ( !ret_val ( intp, 1, err ) ) return RET_ERROR;
+      break;
+      
+    case 0xb8: // ret_popped
+      if ( !state_readvar ( intp->state, 0, &op1, err ) ) return RET_ERROR;
+      if ( !ret_val ( intp, op1, err ) ) return RET_ERROR;
+      break;
+      
+    case 0xc1: // je
+      if ( !read_var_ops ( intp, ops, &nops, -1, err ) ) return RET_ERROR;
+      if ( nops == 0 )
+        {
+          msgerror ( err, "(je) Expected at least 1 operand but 0 found" );
+          return RET_ERROR;
+        }
+      if ( !op_to_u16 ( intp, &(ops[0]), &op1, err ) ) return RET_ERROR;
+      cond= false;
+      for ( n= 1; n < nops && !cond; ++n )
+        {
+          if ( !op_to_u16 ( intp, &(ops[n]), &op2, err ) ) return RET_ERROR;
+          if ( op1 == op2 ) cond= true;
+        }
+      if ( !branch ( intp, cond, err ) ) return RET_ERROR;
       break;
       
     case 0xc9: // and
@@ -1105,6 +1624,32 @@ exec_next_inst (
       if ( !op_to_u16 ( intp, &(ops[0]), &op1, err ) ) return RET_ERROR;
       if ( !op_to_u16 ( intp, &(ops[1]), &op2, err ) ) return RET_ERROR;
       res= op1&op2;
+      if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
+      break;
+
+    case 0xcd: // store
+      if ( !read_var_ops ( intp, ops, &nops, 2, err ) ) return RET_ERROR;
+      if ( ops[0].type != OP_SMALL )
+        {
+          msgerror ( err, "Failed to execute @store: Trying to"
+                     " reference a variable with a non small constant" );
+          return RET_ERROR;
+        }
+      op1_u8= ops[0].u8.val;
+      if ( !op_to_u16 ( intp, &(ops[1]), &op2, err ) ) return RET_ERROR;
+      if ( op1_u8 == 0x00 ) // Si es desa en la pila descarte anterior
+        { if ( !read_var ( intp, 0, &tmp16, err ) ) return RET_ERROR; }
+      if ( !write_var ( intp, op1_u8, op2, err ) ) return RET_ERROR;
+      break;
+      
+    case 0xd0: // loadb
+      if ( !read_var_ops_store ( intp, ops, &nops, 2, &result_var, err ) )
+        return RET_ERROR;
+      if ( !op_to_u16 ( intp, &(ops[0]), &op1, err ) ) return RET_ERROR;
+      if ( !op_to_u16 ( intp, &(ops[1]), &op2, err ) ) return RET_ERROR;
+      if ( !memory_map_READB ( intp->mem, op1 + op2, &res_u8, false, err ) )
+        return RET_ERROR;
+      SET_U8TOU16(res_u8,res);
       if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
       break;
       
@@ -1116,6 +1661,14 @@ exec_next_inst (
       res= (uint16_t) (((int16_t) op1) - ((int16_t) op2));
       if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
       break;
+
+    case 0xd9: // call_2s
+      if ( intp->version < 4 ) goto wrong_version;
+      if ( !read_var_ops_store ( intp, ops, &nops, 2, &result_var, err ) )
+        return RET_ERROR;
+      if ( !call_routine ( intp, ops, nops, result_var, false, err ) )
+        return RET_ERROR;
+      break;
       
     case 0xe0: // call_vs
       if ( !read_var_ops_store ( intp, ops, &nops, -1, &result_var, err ) )
@@ -1123,7 +1676,52 @@ exec_next_inst (
       if ( !call_routine ( intp, ops, nops, result_var, false, err ) )
         return RET_ERROR;
       break;
-
+    case 0xe1: // storew
+      if ( !read_var_ops ( intp, ops, &nops, 3, err ) ) return RET_ERROR;
+      if ( !op_to_u16 ( intp, &(ops[0]), &op1, err ) ) return RET_ERROR;
+      if ( !op_to_u16 ( intp, &(ops[1]), &op2, err ) ) return RET_ERROR;
+      if ( !op_to_u16 ( intp, &(ops[2]), &op3, err ) ) return RET_ERROR;
+      if ( !memory_map_WRITEW ( intp->mem, op1 + 2*op2, op3, false, err ) )
+        return RET_ERROR;
+      break;
+    case 0xe2: // storeb
+      if ( !read_var_ops ( intp, ops, &nops, 3, err ) ) return RET_ERROR;
+      if ( !op_to_u16 ( intp, &(ops[0]), &op1, err ) ) return RET_ERROR;
+      if ( !op_to_u16 ( intp, &(ops[1]), &op2, err ) ) return RET_ERROR;
+      if ( !op_to_u16 ( intp, &(ops[2]), &op3, err ) ) return RET_ERROR;
+      if ( !memory_map_WRITEB ( intp->mem, op1 + op2,
+                                (uint8_t) op3, false, err ) )
+        return RET_ERROR;
+      break;
+    case 0xe3: // put_prop
+      if ( !read_var_ops ( intp, ops, &nops, 3, err ) ) return RET_ERROR;
+      if ( !op_to_u16 ( intp, &(ops[0]), &op1, err ) ) return RET_ERROR;
+      if ( !op_to_u16 ( intp, &(ops[1]), &op2, err ) ) return RET_ERROR;
+      if ( !op_to_u16 ( intp, &(ops[2]), &op3, err ) ) return RET_ERROR;
+      if ( !put_prop ( intp, op1, op2, op3, err ) ) return RET_ERROR;
+      break;
+      
+    case 0xe9: // pull
+      if ( intp->version == 6 )
+        {
+          msgerror ( err, "pull not implemented in version 6" );
+          return RET_ERROR;
+        }
+      else
+        {
+          if ( !read_var_ops ( intp, ops, &nops, 1, err ) ) return RET_ERROR;
+          if ( !op_to_refvar ( intp, &(ops[0]), &op1_u8, err ) )
+            return RET_ERROR;
+          if ( !read_var ( intp, 0, &op1, err ) ) return RET_ERROR;
+          if ( op1_u8 == 0x00 ) // Si es desa en la pila descarte anterior
+            {
+              ww ( "pull - Using stack as variable" );
+              if ( !read_var ( intp, 0, &op2, err ) ) return RET_ERROR;
+            }
+          if ( !write_var ( intp, op1_u8, op1, err ) ) return RET_ERROR;
+        }
+      break;
+      
     case 0xf9: // call_vn
       if ( intp->version < 5 ) goto wrong_version;
       if ( !read_var_ops ( intp, ops, &nops, -1, err ) )
@@ -1149,6 +1747,9 @@ exec_next_inst (
  wrong_version:
   msgerror ( err, "Instruction opcode %02X (%d) is not supported in version %d",
              opcode, opcode, intp->version );
+  return RET_ERROR;
+ division0:
+  msgerror ( err, "Division by 0" );
   return RET_ERROR;
   
 } // end exec_next_inst

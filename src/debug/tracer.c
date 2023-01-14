@@ -62,14 +62,29 @@ get_inst_name (
     case INSTRUCTION_NAME_AND             : return "and             ";
     case INSTRUCTION_NAME_CALL            : return "call            ";
     case INSTRUCTION_NAME_CHECK_ARG_COUNT : return "check_arg_count ";
+    case INSTRUCTION_NAME_DIV             : return "div             ";
     case INSTRUCTION_NAME_GET_PROP        : return "get_prop        ";
     case INSTRUCTION_NAME_GET_PROP_ADDR   : return "get_prop_addr   ";
+    case INSTRUCTION_NAME_INC             : return "inc             ";
     case INSTRUCTION_NAME_JE              : return "je              ";
     case INSTRUCTION_NAME_JG              : return "jg              ";
     case INSTRUCTION_NAME_JIN             : return "jin             ";
     case INSTRUCTION_NAME_JL              : return "jl              ";
+    case INSTRUCTION_NAME_JUMP            : return "jump            ";
     case INSTRUCTION_NAME_JZ              : return "jz              ";
+    case INSTRUCTION_NAME_LOADB           : return "loadb           ";
     case INSTRUCTION_NAME_LOADW           : return "loadw           ";
+    case INSTRUCTION_NAME_MOD             : return "mod             ";
+    case INSTRUCTION_NAME_MUL             : return "mul             ";
+    case INSTRUCTION_NAME_OR              : return "or              ";
+    case INSTRUCTION_NAME_PULL            : return "pull            ";
+    case INSTRUCTION_NAME_PUT_PROP        : return "put_prop        ";
+    case INSTRUCTION_NAME_RET             : return "ret             ";
+    case INSTRUCTION_NAME_RET_POPPED      : return "ret_popped      ";
+    case INSTRUCTION_NAME_RTRUE           : return "rtrue           ";
+    case INSTRUCTION_NAME_STORE           : return "store           ";
+    case INSTRUCTION_NAME_STOREB          : return "storeb          ";
+    case INSTRUCTION_NAME_STOREW          : return "storew          ";
     case INSTRUCTION_NAME_SUB             : return "sub             ";
     case INSTRUCTION_NAME_UNK             :
     default                               : return "unknown         ";
@@ -113,6 +128,15 @@ print_inst_op (
     case INSTRUCTION_OP_TYPE_BRANCH_IF_FALSE:
       printf ( "GOTO %08X (%d) IF false",
                next_addr+op->u32, (int32_t) op->u32 );
+      break;
+    case INSTRUCTION_OP_TYPE_REF_TOP_STACK:
+      printf ( "(st)" );
+      break;
+    case INSTRUCTION_OP_TYPE_REF_LOCAL_VARIABLE:
+      printf ( "(l%u)", op->u8 );
+      break;
+    case INSTRUCTION_OP_TYPE_REF_GLOBAL_VARIABLE:
+      printf ( "(g%u)", op->u8 );
       break;
     case INSTRUCTION_OP_TYPE_RETURN_TRUE_IF_TRUE:
       printf ( "RETURN true IF true" );

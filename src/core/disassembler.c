@@ -252,6 +252,46 @@ read_branch (
 
 
 static bool
+op_to_ref (
+           Instruction  *ins,
+           const int     op,
+           char        **err
+           )
+{
+
+  if ( op >= ins->nops )
+    {
+      msgerror ( err,
+                 "Failed to disassemble instruction: operand %d required",
+                 op+1 );
+      return false;
+    }
+  if ( ins->ops[op].type == INSTRUCTION_OP_TYPE_SMALL_CONSTANT )
+      set_variable_type ( &(ins->ops[op]) );
+  switch ( ins->ops[op].type )
+    {
+    case INSTRUCTION_OP_TYPE_TOP_STACK:
+      ins->ops[op].type= INSTRUCTION_OP_TYPE_REF_TOP_STACK;
+      break;
+    case INSTRUCTION_OP_TYPE_LOCAL_VARIABLE:
+      ins->ops[op].type= INSTRUCTION_OP_TYPE_REF_LOCAL_VARIABLE;
+      break;
+    case INSTRUCTION_OP_TYPE_GLOBAL_VARIABLE:
+      ins->ops[op].type= INSTRUCTION_OP_TYPE_REF_GLOBAL_VARIABLE;
+      break;
+    default:
+      msgerror ( err,
+                 "Failed to disassemble instruction: operand %d is not a"
+                 " valid reference to variable", op+1 );
+      return false;
+    }
+  
+  return true;
+  
+} // end op_to_ref
+
+  
+static bool
 ins_2op (
          Instruction            *ins,
          const MemoryMap        *mem,
@@ -389,6 +429,30 @@ ins_1op (
 
 
 static bool
+ins_1op_store (
+               Instruction            *ins,
+               const MemoryMap        *mem,
+               uint32_t               *addr,
+               const InstructionName   name,
+               char                  **err
+               )
+{
+
+  if ( !ins_1op ( ins, mem, addr, name, err ) )
+    return false;
+  if ( !memory_map_READB ( mem, *addr, &(ins->store_op.u8), true, err ) )
+    return false;
+  ++(*addr);
+  ins->bytes[ins->nbytes++]= ins->store_op.u8;
+  set_variable_type ( &(ins->store_op) );
+  ins->store= true;
+  
+  return true;
+  
+} // end ins_1op_store
+
+
+static bool
 ins_1op_branch (
                 Instruction            *ins,
                 const MemoryMap        *mem,
@@ -517,11 +581,29 @@ decode_next_inst (
         return false;
       break;
 
+    case 0x08: // or
+      if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_OR, err ) )
+        return false;
+      break;
+    case 0x09: // and
+      if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_AND, err ) )
+        return false;
+      break;
+      
+    case 0x0d: // store
+      if ( !ins_2op ( ins, mem, &addr, INSTRUCTION_NAME_STORE, err ) )
+        return false;
+      if ( !op_to_ref ( ins, 0, err ) ) return false;
+      break;
+
     case 0x0f: // loadw
       if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_LOADW, err ) )
         return false;
       break;
-      
+    case 0x10: // loadb
+      if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_LOADB, err ) )
+        return false;
+      break;
     case 0x11: // get_prop
       if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_GET_PROP, err ) )
         return false;
@@ -534,6 +616,22 @@ decode_next_inst (
       
     case 0x14: // add
       if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_ADD, err ) )
+        return false;
+      break;
+    case 0x15: // sub
+      if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_SUB, err ) )
+        return false;
+      break;
+    case 0x16: // mul
+      if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_MUL, err ) )
+        return false;
+      break;
+    case 0x17: // div
+      if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_DIV, err ) )
+        return false;
+      break;
+    case 0x18: // mod
+      if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_MOD, err ) )
         return false;
       break;
 
@@ -554,12 +652,30 @@ decode_next_inst (
       if ( !ins_2op_branch ( ins, mem, &addr, INSTRUCTION_NAME_JIN, err ) )
         return false;
       break;
+
+    case 0x28: // or
+      if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_OR, err ) )
+        return false;
+      break;
+    case 0x29: // and
+      if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_AND, err ) )
+        return false;
+      break;
+      
+    case 0x2d: // store
+      if ( !ins_2op ( ins, mem, &addr, INSTRUCTION_NAME_STORE, err ) )
+        return false;
+      if ( !op_to_ref ( ins, 0, err ) ) return false;
+      break;
       
     case 0x2f: // loadw
       if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_LOADW, err ) )
         return false;
       break;
-      
+    case 0x30: // loadb
+      if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_LOADB, err ) )
+        return false;
+      break;
     case 0x31: // get_prop
       if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_GET_PROP, err ) )
         return false;
@@ -572,6 +688,22 @@ decode_next_inst (
       
     case 0x34: // add
       if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_ADD, err ) )
+        return false;
+      break;
+    case 0x35: // sub
+      if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_SUB, err ) )
+        return false;
+      break;
+    case 0x36: // mul
+      if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_MUL, err ) )
+        return false;
+      break;
+    case 0x37: // div
+      if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_DIV, err ) )
+        return false;
+      break;
+    case 0x38: // mod
+      if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_MOD, err ) )
         return false;
       break;
 
@@ -593,11 +725,29 @@ decode_next_inst (
         return false;
       break;
 
+    case 0x48: // or
+      if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_OR, err ) )
+        return false;
+      break;
+    case 0x49: // and
+      if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_AND, err ) )
+        return false;
+      break;
+      
+    case 0x4d: // store
+      if ( !ins_2op ( ins, mem, &addr, INSTRUCTION_NAME_STORE, err ) )
+        return false;
+      if ( !op_to_ref ( ins, 0, err ) ) return false;
+      break;
+      
     case 0x4f: // loadw
       if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_LOADW, err ) )
         return false;
       break;
-      
+    case 0x50: // loadb
+      if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_LOADB, err ) )
+        return false;
+      break;
     case 0x51: // get_prop
       if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_GET_PROP, err ) )
         return false;
@@ -610,6 +760,22 @@ decode_next_inst (
       
     case 0x54: // add
       if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_ADD, err ) )
+        return false;
+      break;
+    case 0x55: // sub
+      if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_SUB, err ) )
+        return false;
+      break;
+    case 0x56: // mul
+      if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_MUL, err ) )
+        return false;
+      break;
+    case 0x57: // div
+      if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_DIV, err ) )
+        return false;
+      break;
+    case 0x58: // mod
+      if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_MOD, err ) )
         return false;
       break;
 
@@ -631,11 +797,29 @@ decode_next_inst (
         return false;
       break;
 
+    case 0x68: // or
+      if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_OR, err ) )
+        return false;
+      break;
+    case 0x69: // and
+      if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_AND, err ) )
+        return false;
+      break;
+      
+    case 0x6d: // store
+      if ( !ins_2op ( ins, mem, &addr, INSTRUCTION_NAME_STORE, err ) )
+        return false;
+      if ( !op_to_ref ( ins, 0, err ) ) return false;
+      break;
+      
     case 0x6f: // loadw
       if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_LOADW, err ) )
         return false;
       break;
-      
+    case 0x70: // loadb
+      if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_LOADB, err ) )
+        return false;
+      break;
     case 0x71: // get_prop
       if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_GET_PROP, err ) )
         return false;
@@ -650,9 +834,48 @@ decode_next_inst (
       if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_ADD, err ) )
         return false;
       break;
-
+    case 0x75: // sub
+      if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_SUB, err ) )
+        return false;
+      break;
+    case 0x76: // mul
+      if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_MUL, err ) )
+        return false;
+      break;
+    case 0x77: // div
+      if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_DIV, err ) )
+        return false;
+      break;
+    case 0x78: // mod
+      if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_MOD, err ) )
+        return false;
+      break;
+      
     case 0x80: // jz
       if ( !ins_1op_branch ( ins, mem, &addr, INSTRUCTION_NAME_JZ, err ) )
+        return false;
+      break;
+
+    case 0x85: // inc
+      if ( !ins_1op ( ins, mem, &addr, INSTRUCTION_NAME_INC, err ) )
+        return false;
+      if ( !op_to_ref ( ins, 0, err ) ) return false;
+      break;
+
+    case 0x88: // call_1s
+      if ( mem->sf_mem[0] >= 4 )
+        {
+          if ( !ins_1op_store ( ins, mem, &addr, INSTRUCTION_NAME_CALL, err ) )
+            return false;
+        }
+      break;
+
+    case 0x8b: // ret
+      if ( !ins_1op ( ins, mem, &addr, INSTRUCTION_NAME_RET, err ) )
+        return false;
+      break;
+    case 0x8c: // jump
+      if ( !ins_1op ( ins, mem, &addr, INSTRUCTION_NAME_JUMP, err ) )
         return false;
       break;
 
@@ -661,26 +884,128 @@ decode_next_inst (
         return false;
       break;
 
+    case 0x95: // inc
+      if ( !ins_1op ( ins, mem, &addr, INSTRUCTION_NAME_INC, err ) )
+        return false;
+      if ( !op_to_ref ( ins, 0, err ) ) return false;
+      break;
+      
+    case 0x98: // call_1s
+      if ( mem->sf_mem[0] >= 4 )
+        {
+          if ( !ins_1op_store ( ins, mem, &addr, INSTRUCTION_NAME_CALL, err ) )
+            return false;
+        }
+      break;
+      
+    case 0x9b: // ret
+      if ( !ins_1op ( ins, mem, &addr, INSTRUCTION_NAME_RET, err ) )
+        return false;
+      break;
+    case 0x9c: // jump
+      if ( !ins_1op ( ins, mem, &addr, INSTRUCTION_NAME_JUMP, err ) )
+        return false;
+      break;
+
     case 0xa0: // jz
       if ( !ins_1op_branch ( ins, mem, &addr, INSTRUCTION_NAME_JZ, err ) )
         return false;
+      break;
+
+    case 0xa5: // inc
+      if ( !ins_1op ( ins, mem, &addr, INSTRUCTION_NAME_INC, err ) )
+        return false;
+      if ( !op_to_ref ( ins, 0, err ) ) return false;
+      break;
+      
+    case 0xa8: // call_1s
+      if ( mem->sf_mem[0] >= 4 )
+        {
+          if ( !ins_1op_store ( ins, mem, &addr, INSTRUCTION_NAME_CALL, err ) )
+            return false;
+        }
+      break;
+      
+    case 0xab: // ret
+      if ( !ins_1op ( ins, mem, &addr, INSTRUCTION_NAME_RET, err ) )
+        return false;
+      break;
+    case 0xac: // jump
+      if ( !ins_1op ( ins, mem, &addr, INSTRUCTION_NAME_JUMP, err ) )
+        return false;
+      break;
+      
+    case 0xb0: // ret_popped;
+      ins->name= INSTRUCTION_NAME_RTRUE;
+      break;
+      
+    case 0xb8: // ret_popped;
+      ins->name= INSTRUCTION_NAME_RET_POPPED;
+      break;
+      
+    case 0xc1: // je
+      if ( !read_var_ops ( ins, mem, &addr, err ) ) return false;
+      ins->name= INSTRUCTION_NAME_JE;
+      if ( !read_branch ( ins, mem, &addr, err ) ) return false;
       break;
       
     case 0xc9: // and
       if ( !read_var_ops_store ( ins, mem, &addr, err ) ) return false;
       if ( !ins_var_2ops ( ins, INSTRUCTION_NAME_AND, err ) ) return false;
       break;
+
+    case 0xcd: // store
+      if ( !read_var_ops ( ins, mem, &addr, err ) ) return false;
+      if ( !ins_var_2ops ( ins, INSTRUCTION_NAME_STORE, err ) ) return false;
+      break;
+      
+    case 0xd0: // loadb
+      if ( !read_var_ops_store ( ins, mem, &addr, err ) ) return false;
+      if ( !ins_var_2ops ( ins, INSTRUCTION_NAME_LOADB, err ) ) return false;
+      break;
       
     case 0xd5: // sub
       if ( !read_var_ops_store ( ins, mem, &addr, err ) ) return false;
       if ( !ins_var_2ops ( ins, INSTRUCTION_NAME_SUB, err ) ) return false;
+      break;
+
+    case 0xd9: // call_2s NOTA!! No cal comprovar que han de ser 2
+      if ( mem->sf_mem[0] >= 4 )
+        {
+          if ( !read_var_ops_store ( ins, mem, &addr, err ) ) return false;
+          if ( !ins_call ( ins, mem, err ) ) return false;
+        }
       break;
       
     case 0xe0: // call_vs
       if ( !read_var_ops_store ( ins, mem, &addr, err ) ) return false;
       if ( !ins_call ( ins, mem, err ) ) return false;
       break;
+    case 0xe1: // storew
+      if ( !read_var_ops ( ins, mem, &addr, err ) ) return false;
+      ins->name= INSTRUCTION_NAME_STOREW;
+      break;
+    case 0xe2: // storeb
+      if ( !read_var_ops ( ins, mem, &addr, err ) ) return false;
+      ins->name= INSTRUCTION_NAME_STOREB;
+      break;
+    case 0xe3: // put_prop
+      if ( !read_var_ops ( ins, mem, &addr, err ) ) return false;
+      ins->name= INSTRUCTION_NAME_PUT_PROP;
+      break;
 
+    case 0xe9: //
+      if ( mem->sf_mem[0] == 6 )
+        {
+        }
+      else
+        {
+          if ( !read_var_ops ( ins, mem, &addr, err ) ) return false;
+          if ( !op_to_ref ( ins, 0, err ) ) return false;
+          ins->name= INSTRUCTION_NAME_PULL;
+        }
+      break;
+      
     case 0xf9: // call_vn
       if ( mem->sf_mem[0] >= 5 )
         {
