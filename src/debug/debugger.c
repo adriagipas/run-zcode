@@ -18,18 +18,19 @@
  * <https://www.gnu.org/licenses/>.
  */
 /*
- *  error.c - Implementació de 'error.h'.
+ *  debugger.c - Implementació de 'debugger.h'.
  *
  */
 
 
-#include <errno.h>
 #include <glib.h>
-#include <stdarg.h>
 #include <stddef.h>
+#include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+
+#include "debugger.h"
+#include "tokenizer.h"
 
 
 
@@ -38,43 +39,39 @@
 /* FUNCIONS PÚBLIQUES */
 /**********************/
 
-void
-msgerror (
-          char       **err,
-          const char  *format,
-          ...
-          )
+bool
+debugger_run (
+              const gboolean   verbose,
+              char           **err
+              )
 {
 
-  va_list ap;
-  static char buffer[1000];
+  Tokenizer *t;
+  const char **tokens;
   
   
-  if  ( err == NULL ) return;
-  va_start ( ap, format );
-  vsnprintf ( buffer, 1000, format, ap );
-  va_end ( ap );
-  *err= g_new ( char, strlen(buffer)+1 );
-  strcpy ( *err, buffer );
+  // Preparació.
+  t= NULL;
+
+  // Inicialitza.
+  t= tokenizer_new ( stdin, err );
+  if ( t == NULL ) goto error;
   
-} // end msgerror
-
-
-void
-error_file_ (
-             char       **err,
-             const char  *msg,
-             const char  *file_name
-             )
-{
-
-  if ( errno != 0 )
+  while ( (tokens= tokenizer_get_line ( t, err ) ) != NULL )
     {
-      msgerror ( err, "%s [%s]: %s",
-                 msg, strerror ( errno ), file_name );
-      errno= 0;
+      for ( ; *tokens != NULL; ++tokens )
+        printf ( "[%s]", *tokens );
+      printf ( "\n" );
     }
-  else
-    msgerror ( err, "%s: %s", msg, file_name );
+  if ( tokenizer_check_error ( t ) ) goto error;
   
-} // end error_file_
+  // Allibera memòria.
+  tokenizer_free ( t );
+  
+  return true;
+
+ error:
+  if ( t != NULL ) tokenizer_free ( t );
+  return false;
+  
+} // end debugger_run

@@ -30,6 +30,7 @@
 #include <stdlib.h>
 
 #include "core/interpreter.h"
+#include "debug/debugger.h"
 #include "utils/log.h"
 
 
@@ -141,8 +142,6 @@ free_opts (
 /* PROGRAMA PRINCIPAL */
 /**********************/
 
-#include "debug/tracer.h"
-
 int main ( int argc, char *argv[] )
 {
   
@@ -150,15 +149,18 @@ int main ( int argc, char *argv[] )
   struct opts opts;
   Interpreter *intp;
   char *err;
+  bool ok;
   
   
   setlocale ( LC_ALL, "" );
-
+  
   usage ( &argc, &argv, &args, &opts );
   err= NULL;
   if ( opts.debug )
     {
-      DebugTracer *tracer;
+      ok= debugger_run ( opts.verbose, &err );
+      /*
+        DebugTracer *tracer;
       tracer= debug_tracer_new ( DEBUG_TRACER_FLAGS_CPU |
                                  DEBUG_TRACER_FLAGS_MEM |
                                  DEBUG_TRACER_FLAGS_STACK 
@@ -170,17 +172,25 @@ int main ( int argc, char *argv[] )
         ee ( err );
       interpreter_free ( intp );
       debug_tracer_free ( tracer );
+     */
     }
   else
     {
       intp= interpreter_new_from_file_name ( args.zcode_fn, NULL, &err );
-      if ( intp == NULL ) ee ( err );
-      if ( !interpreter_run ( intp, &err ) )
-        ee ( err );
-      interpreter_free ( intp );
+      if ( intp == NULL ) ok= false;
+      else
+        {
+          ok= interpreter_run ( intp, &err );
+          interpreter_free ( intp );
+        }
     }
   free_opts ( &opts );
-  
-  return EXIT_SUCCESS;
+  if ( ok ) return EXIT_SUCCESS;
+  else
+    {
+      fprintf ( stderr, "[EE] %s\n", err  );
+      g_free ( err );
+      return EXIT_FAILURE;
+    }
   
 }
