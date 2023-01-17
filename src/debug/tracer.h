@@ -32,16 +32,18 @@
 #include "core/disassembler.h"
 #include "core/tracer.h"
 
-#define DEBUG_TRACER_FLAGS_CPU   0x01
-#define DEBUG_TRACER_FLAGS_MEM   0x02
-#define DEBUG_TRACER_FLAGS_STACK 0x04
+#define DEBUG_TRACER_FLAGS_CPU      0x01
+#define DEBUG_TRACER_FLAGS_MEM      0x02
+#define DEBUG_TRACER_FLAGS_STACK    0x04
+#define DEBUG_TRACER_FLAGS_PRINT_CC 0x08
 
 typedef struct
 {
 
   // Tots els camps són privats
   TRACER_CLASS;
-  uint32_t flags; // Indica que s'imprimeix per pantalla i què no.
+  uint32_t      flags; // Indica que s'imprimeix per pantalla i què no.
+  unsigned long cc; // Cicles executats
   
 } DebugTracer;
 
@@ -54,5 +56,11 @@ DebugTracer *
 debug_tracer_new (
                   const uint32_t init_flags
                   );
+
+#define debug_tracer_enable_flags(DT,FLAGS)     \
+  ((DT)->flags|= (FLAGS))
+
+#define debug_tracer_disable_flags(DT,FLAGS)     \
+  ((DT)->flags&= ~(FLAGS))
 
 #endif // __DEBUG__TRACER_H__

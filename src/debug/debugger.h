@@ -30,6 +30,7 @@
 
 bool
 debugger_run (
+              const char      *zcode_fn,
               const gboolean   verbose,
               char           **err
               );

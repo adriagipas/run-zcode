@@ -158,21 +158,7 @@ int main ( int argc, char *argv[] )
   err= NULL;
   if ( opts.debug )
     {
-      ok= debugger_run ( opts.verbose, &err );
-      /*
-        DebugTracer *tracer;
-      tracer= debug_tracer_new ( DEBUG_TRACER_FLAGS_CPU |
-                                 DEBUG_TRACER_FLAGS_MEM |
-                                 DEBUG_TRACER_FLAGS_STACK 
-                                 );
-      intp= interpreter_new_from_file_name
-        ( args.zcode_fn, TRACER(tracer), &err );
-      if ( intp == NULL ) ee ( err );
-      if ( !interpreter_trace ( intp, 2000, &err ) )
-        ee ( err );
-      interpreter_free ( intp );
-      debug_tracer_free ( tracer );
-     */
+      ok= debugger_run ( args.zcode_fn, opts.verbose, &err );
     }
   else
     {

@@ -50,6 +50,16 @@
 /* FUNCIONS PRIVADES */
 /*********************/
 
+static void
+print_cc (
+          const DebugTracer *tracer
+          )
+{
+  if ( tracer->flags&DEBUG_TRACER_FLAGS_PRINT_CC )
+  printf ( "CC:%016lu  ", tracer->cc-1 );
+} // end princ_cc
+
+
 static const char *
 get_inst_name (
                const InstructionName name
@@ -170,10 +180,12 @@ exec_inst (
   
 
   self= DEBUG_TRACER(self_);
+  ++(self->cc);
   if ( (self->flags&DEBUG_TRACER_FLAGS_CPU) == 0  ) return;
 
   next_addr= ins->addr + ((uint32_t) ins->nbytes);
-  
+
+  print_cc ( self );
   printf ( "[CPU]  ADDR: %08X  ", ins->addr );
   for ( n= 0; n < ins->nbytes; ++n ) printf ( " %02X", ins->bytes[n] );
   for ( ; n < 23; ++n ) printf ( "   " );
@@ -217,6 +229,7 @@ mem_access (
   self= DEBUG_TRACER(self_);
   if ( (self->flags&DEBUG_TRACER_FLAGS_MEM) == 0  ) return;
 
+  print_cc ( self );
   switch ( type )
     {
     case MEM_ACCESS_READB:
@@ -258,6 +271,7 @@ stack_access (
   self= DEBUG_TRACER(self_);
   if ( (self->flags&DEBUG_TRACER_FLAGS_STACK) == 0  ) return;
 
+  print_cc ( self );
   switch ( type )
     {
     case STACK_ACCESS_READ:
@@ -307,6 +321,7 @@ debug_tracer_new (
   ret->mem_access= mem_access;
   ret->stack_access= stack_access;
   ret->flags= init_flags;
+  ret->cc= 0;
 
   return ret;
   
