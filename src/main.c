@@ -31,6 +31,7 @@
 
 #include "core/interpreter.h"
 #include "debug/debugger.h"
+#include "frontend/conf.h"
 #include "utils/log.h"
 
 
@@ -60,8 +61,9 @@ struct args
 struct opts
 {
 
-  gboolean verbose;
-  gboolean debug;
+  gboolean  verbose;
+  gboolean  debug;
+  gchar    *conf_fn;
   
 };
 
@@ -83,8 +85,9 @@ usage (
   
   static struct opts vals=
     {
-      FALSE, // verbose
-      FALSE  // debug
+      FALSE,  // verbose
+      FALSE,  // debug
+      NULL    // conf_fn
     };
 
   static GOptionEntry entries[]=
@@ -94,13 +97,16 @@ usage (
         NULL },
       { "debug", 'D', 0, G_OPTION_ARG_NONE, &vals.debug,
         "Enable debug mode (interactive console)" },
+      { "conf", 'c', 0, G_OPTION_ARG_STRING, &vals.conf_fn,
+        "Specify the configuration file. By default use the"
+        " standard configuration file" },
       { NULL }
     };
-
+  
   GError *err;
   GOptionContext *context;
-
-
+  
+  
   // Parseja opcions.
   err= NULL;
   context= g_option_context_new ( "<story-file> - run Z-Machine story"
@@ -133,6 +139,9 @@ free_opts (
            struct opts *opts
            )
 {
+  
+  g_free ( opts->conf_fn );
+  
 } // end free_opts
 
 
@@ -148,35 +157,48 @@ int main ( int argc, char *argv[] )
   struct args args;
   struct opts opts;
   Interpreter *intp;
+  Conf *conf;
   char *err;
-  bool ok;
   
-  
+
+  // Prepara.
   setlocale ( LC_ALL, "" );
-  
-  usage ( &argc, &argv, &args, &opts );
   err= NULL;
+  intp= NULL;
+  conf= NULL;
+
+  // Parseja opcions i configuració.
+  usage ( &argc, &argv, &args, &opts );
+  conf= conf_new ( opts.verbose, opts.conf_fn, &err );
+  if ( conf == NULL ) goto error;
+  
+  // Executa.
   if ( opts.debug )
     {
-      ok= debugger_run ( args.zcode_fn, opts.verbose, &err );
+      if ( !debugger_run ( args.zcode_fn, opts.verbose, &err ) )
+        goto error;
     }
   else
     {
       intp= interpreter_new_from_file_name ( args.zcode_fn, NULL, &err );
-      if ( intp == NULL ) ok= false;
-      else
-        {
-          ok= interpreter_run ( intp, &err );
-          interpreter_free ( intp );
-        }
+      if ( intp == NULL ) goto error;
+      if ( !interpreter_run ( intp, &err ) ) goto error;
+      interpreter_free ( intp ); intp= NULL;
     }
+  
+  // Allibera i acaba.
+  if ( !conf_write ( conf, &err ) ) goto error;
+  conf_free ( conf );
   free_opts ( &opts );
-  if ( ok ) return EXIT_SUCCESS;
-  else
-    {
-      fprintf ( stderr, "[EE] %s\n", err  );
-      g_free ( err );
-      return EXIT_FAILURE;
-    }
+  
+  return EXIT_SUCCESS;
+  
+ error:
+  fprintf ( stderr, "[EE] %s\n", err  );
+  g_free ( err );
+  if ( conf != NULL ) conf_free ( conf );
+  if ( intp != NULL ) interpreter_free ( intp );
+  free_opts ( &opts );
+  return EXIT_FAILURE;
   
 }
