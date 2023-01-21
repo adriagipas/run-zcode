@@ -18,52 +18,61 @@
  * <https://www.gnu.org/licenses/>.
  */
 /*
- *  conf.h - Fitxer de configuració.
+ *  fonts.h - S'encarrega de gestionar les fonts.
  *
  */
 
-#ifndef __FRONTEND__CONF_H__
-#define __FRONTEND__CONF_H__
+#ifndef __FRONTEND__FONTS_H__
+#define __FRONTEND__FONTS_H__
 
 #include <glib.h>
+#include <SDL_ttf.h>
+
+#include "conf.h"
+
+enum {
+  F_NORMAL= 0,
+  F_FPITCH,
+  F_NUM_FONTS
+};
+
+enum {
+  F_ROMAN= 0,
+  F_BOLD,
+  F_ITALIC,
+  F_NUM_STYLES
+};
 
 typedef struct
 {
 
-  // CAMPS PÚBLICS
-  // --> Fonts
-  gint   font_size;
-  gchar *font_normal_roman;
-  gchar *font_normal_bold;
-  gchar *font_normal_italic;
-  gchar *font_fpitch_roman;
-  gchar *font_fpitch_bold;
-  gchar *font_fpitch_italic;
-  
-  // CAMPS PRIVATS
+  // CAMPS PRIVATS.
   gboolean  _verbose;
-  gchar    *_file_name;
+  Conf     *_conf; // No s'allibera
+
+  // Nom de fitxers
+  char *_font_normal_roman_fn;
+  char *_font_normal_bold_fn;
+  char *_font_normal_italic_fn;
+  char *_font_fpitch_roman_fn;
+  char *_font_fpitch_bold_fn;
+  char *_font_fpitch_italic_fn;
+
+  // Fonts.
+  TTF_Font *_fonts[F_NUM_FONTS][F_NUM_STYLES];
   
-} Conf;
+} Fonts;
 
 void
-conf_free (
-           Conf *conf
-           );
-
-// Si no es proporciona un 'file_name' es llig el fitxer per defecte.
-Conf *
-conf_new (
-          const gboolean   verbose,
-          const gchar     *file_name, // Pot ser NULL
-          char           **err
-          );
-
-// Escriu en disc la configuració actual.
-bool
-conf_write (
-            Conf  *conf,
-            char **err
+fonts_free (
+            Fonts *f
             );
 
-#endif // __FRONTEND__CONF_H__
+Fonts *
+fonts_new (
+           Conf            *conf,
+           const gboolean   verbose,
+           char           **err
+           );
+
+#endif // __FRONTEND__FONTS_H__

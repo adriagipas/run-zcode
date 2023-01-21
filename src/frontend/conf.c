@@ -42,9 +42,20 @@
 /* MACROS */
 /**********/
 
-#define GROUP "main"
+#define GROUP_FONTS "Fonts"
 
 #define DIRNAME "runzcode"
+
+#define DEFAULT_FONT_SIZE          12
+#define DEFAULT_FONT_NORMAL_ROMAN  "sans"
+#define DEFAULT_FONT_NORMAL_BOLD   "sans:style=bold"
+#define DEFAULT_FONT_NORMAL_ITALIC "sans:style=oblique"
+#define DEFAULT_FONT_FPITCH_ROMAN  "mono"
+#define DEFAULT_FONT_FPITCH_BOLD   "mono:style=bold"
+#define DEFAULT_FONT_FPITCH_ITALIC "mono:style=oblique"
+
+#define MIN_FONT_SIZE 8
+#define MAX_FONT_SIZE 64
 
 
 
@@ -105,9 +116,37 @@ set_default_values (
                     )
 {
 
-  conf->font_size= 12;
+  conf->font_size= DEFAULT_FONT_SIZE;
+  conf->font_normal_roman= g_strdup ( DEFAULT_FONT_NORMAL_ROMAN );
+  conf->font_normal_bold= g_strdup ( DEFAULT_FONT_NORMAL_BOLD );
+  conf->font_normal_italic= g_strdup ( DEFAULT_FONT_NORMAL_ITALIC );
+  conf->font_fpitch_roman= g_strdup ( DEFAULT_FONT_FPITCH_ROMAN );
+  conf->font_fpitch_bold= g_strdup ( DEFAULT_FONT_FPITCH_BOLD );
+  conf->font_fpitch_italic= g_strdup ( DEFAULT_FONT_FPITCH_ITALIC );
   
 } // end set_default_values
+
+
+static void
+read_string (
+             GKeyFile     *f,
+             const gchar  *group,
+             const gchar  *key,
+             gchar       **dst
+             )
+{
+
+  gchar *val;
+
+
+  val= g_key_file_get_string ( f, group, key, NULL );
+  if ( val != NULL )
+    {
+      g_free ( *dst );
+      *dst= val;
+    }
+  
+} // end read_string
 
 
 static bool
@@ -135,15 +174,26 @@ read_conf (
                                    G_KEY_FILE_NONE, &gerr );
   if ( !ret ) goto error;
   
-  // Llig valors.
-  // --> Font size
-  val_i= g_key_file_get_integer ( f, GROUP, "font-size", NULL );
-  if ( val_i < 8 || val_i > 64 )
+  // Fonts.
+  val_i= g_key_file_get_integer ( f, GROUP_FONTS, "size", NULL );
+  if ( val_i < MIN_FONT_SIZE || val_i > MAX_FONT_SIZE )
     {
       ww ( "Invalid font-size %d. Using default font-size", val_i );
-      val_i= 12;
+      val_i= DEFAULT_FONT_SIZE;
     }
   conf->font_size= val_i;
+  read_string ( f, GROUP_FONTS, "normal-roman",
+                &(conf->font_normal_roman) );
+  read_string ( f, GROUP_FONTS, "normal-bold",
+                &(conf->font_normal_bold) );
+  read_string ( f, GROUP_FONTS, "normal-italic",
+                &(conf->font_normal_italic) );
+  read_string ( f, GROUP_FONTS, "fpitch-roman",
+                &(conf->font_fpitch_roman) );
+  read_string ( f, GROUP_FONTS, "fpitch-bold",
+                &(conf->font_fpitch_bold) );
+  read_string ( f, GROUP_FONTS, "fpitch-italic",
+                &(conf->font_fpitch_italic) );
   
   // Allibera.
   g_key_file_free ( f );
@@ -171,6 +221,12 @@ conf_free (
            )
 {
 
+  g_free ( conf->font_normal_roman );
+  g_free ( conf->font_normal_bold );
+  g_free ( conf->font_normal_italic );
+  g_free ( conf->font_fpitch_roman );
+  g_free ( conf->font_fpitch_bold );
+  g_free ( conf->font_fpitch_italic );
   g_free ( conf->_file_name );
   g_free ( conf );
   
@@ -192,7 +248,13 @@ conf_new (
   ret= g_new ( Conf, 1 );
   ret->_verbose= verbose;
   ret->_file_name= NULL;
-
+  ret->font_normal_roman= NULL;
+  ret->font_normal_bold= NULL;
+  ret->font_normal_italic= NULL;
+  ret->font_fpitch_roman= NULL;
+  ret->font_fpitch_bold= NULL;
+  ret->font_fpitch_italic= NULL;
+  
   // Obté el nom
   if ( file_name != NULL )
     ret->_file_name= g_strdup ( file_name );
@@ -234,9 +296,21 @@ conf_write (
     ii ( "Writing configuration file: '%s'", conf->_file_name );
   f= g_key_file_new ();
 
-  // Font size
-  g_key_file_set_integer ( f, GROUP, "font-size", conf->font_size );
-
+  // Fonts
+  g_key_file_set_integer ( f, GROUP_FONTS, "size", conf->font_size );
+  g_key_file_set_string ( f, GROUP_FONTS, "normal-roman",
+                          conf->font_normal_roman );
+  g_key_file_set_string ( f, GROUP_FONTS, "normal-bold",
+                          conf->font_normal_bold );
+  g_key_file_set_string ( f, GROUP_FONTS, "normal-italic",
+                          conf->font_normal_italic );
+  g_key_file_set_string ( f, GROUP_FONTS, "fpitch-roman",
+                          conf->font_fpitch_roman );
+  g_key_file_set_string ( f, GROUP_FONTS, "fpitch-bold",
+                          conf->font_fpitch_bold );
+  g_key_file_set_string ( f, GROUP_FONTS, "fpitch-italic",
+                          conf->font_fpitch_italic );
+  
   // Escriu
   gerr= NULL;
   ret= g_key_file_save_to_file ( f, conf->_file_name, &gerr );
