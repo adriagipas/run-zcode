@@ -8,7 +8,7 @@ subdir('frontend')
 SRC_FILES= files('main.c')
 RUNZCODE= executable('run-zcode',
                      SRC_FILES,
-                     dependencies : [GLIB2,FONTCONFIG,SDL2TTF],
+                     dependencies : [GLIB2,FONTCONFIG,SDL2TTF,SDL2],
                      include_directories : [],
                      link_with : [CORE,UTILS,DEBUG,FRONTEND],
                      install : true)
