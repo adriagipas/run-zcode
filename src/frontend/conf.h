@@ -31,6 +31,11 @@ typedef struct
 {
 
   // CAMPS PÚBLICS
+  // --> Screen
+  gint     screen_lines;
+  gint     screen_width; // Mesurat en caràcters
+  gboolean screen_fullscreen;
+  
   // --> Fonts
   gint   font_size;
   gchar *font_normal_roman;
@@ -39,7 +44,7 @@ typedef struct
   gchar *font_fpitch_roman;
   gchar *font_fpitch_bold;
   gchar *font_fpitch_italic;
-  
+
   // CAMPS PRIVATS
   gboolean  _verbose;
   gchar    *_file_name;

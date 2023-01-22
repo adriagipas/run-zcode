@@ -42,11 +42,12 @@
 /* MACROS */
 /**********/
 
+#define GROUP_SCREEN "Screen"
 #define GROUP_FONTS "Fonts"
 
 #define DIRNAME "runzcode"
 
-#define DEFAULT_FONT_SIZE          12
+#define DEFAULT_FONT_SIZE          8
 #define DEFAULT_FONT_NORMAL_ROMAN  "sans"
 #define DEFAULT_FONT_NORMAL_BOLD   "sans:style=bold"
 #define DEFAULT_FONT_NORMAL_ITALIC "sans:style=oblique"
@@ -54,7 +55,14 @@
 #define DEFAULT_FONT_FPITCH_BOLD   "mono:style=bold"
 #define DEFAULT_FONT_FPITCH_ITALIC "mono:style=oblique"
 
-#define MIN_FONT_SIZE 8
+#define DEFAULT_SCREEN_LINES      25
+#define DEFAULT_SCREEN_WIDTH      80
+#define DEFAULT_SCREEN_FULLSCREEN FALSE
+
+#define MIN_SCREEN_LINES 14
+#define MIN_SCREEN_WIDTH 60
+
+#define MIN_FONT_SIZE 6
 #define MAX_FONT_SIZE 64
 
 
@@ -116,6 +124,12 @@ set_default_values (
                     )
 {
 
+  // Screen
+  conf->screen_lines= DEFAULT_SCREEN_LINES;
+  conf->screen_width= DEFAULT_SCREEN_WIDTH;
+  conf->screen_fullscreen= DEFAULT_SCREEN_FULLSCREEN;
+  
+  // Fonts
   conf->font_size= DEFAULT_FONT_SIZE;
   conf->font_normal_roman= g_strdup ( DEFAULT_FONT_NORMAL_ROMAN );
   conf->font_normal_bold= g_strdup ( DEFAULT_FONT_NORMAL_BOLD );
@@ -173,12 +187,30 @@ read_conf (
   ret= g_key_file_load_from_file ( f, conf->_file_name,
                                    G_KEY_FILE_NONE, &gerr );
   if ( !ret ) goto error;
+
+  // Screen
+  val_i= g_key_file_get_integer ( f, GROUP_SCREEN, "lines", NULL );
+  if ( val_i < MIN_SCREEN_LINES )
+    {
+      ww ( "Invalid screen lines number %d. Using default value", val_i );
+      val_i= DEFAULT_SCREEN_LINES;
+    }
+  conf->screen_lines= val_i;
+  val_i= g_key_file_get_integer ( f, GROUP_SCREEN, "width", NULL );
+  if ( val_i < MIN_SCREEN_WIDTH )
+    {
+      ww ( "Invalid screen width %d. Using default value", val_i );
+      val_i= DEFAULT_SCREEN_WIDTH;
+    }
+  conf->screen_width= val_i;
+  conf->screen_fullscreen=
+    g_key_file_get_boolean ( f, GROUP_SCREEN, "fullscreen", NULL );
   
   // Fonts.
   val_i= g_key_file_get_integer ( f, GROUP_FONTS, "size", NULL );
   if ( val_i < MIN_FONT_SIZE || val_i > MAX_FONT_SIZE )
     {
-      ww ( "Invalid font-size %d. Using default font-size", val_i );
+      ww ( "Invalid font size %d. Using default font size", val_i );
       val_i= DEFAULT_FONT_SIZE;
     }
   conf->font_size= val_i;
@@ -296,6 +328,12 @@ conf_write (
     ii ( "Writing configuration file: '%s'", conf->_file_name );
   f= g_key_file_new ();
 
+  // Screen
+  g_key_file_set_integer ( f, GROUP_SCREEN, "lines", conf->screen_lines );
+  g_key_file_set_integer ( f, GROUP_SCREEN, "width", conf->screen_width );
+  g_key_file_set_boolean ( f, GROUP_SCREEN, "fullscreen",
+                           conf->screen_fullscreen );
+  
   // Fonts
   g_key_file_set_integer ( f, GROUP_FONTS, "size", conf->font_size );
   g_key_file_set_string ( f, GROUP_FONTS, "normal-roman",

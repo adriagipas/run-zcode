@@ -180,15 +180,17 @@ get_font_files (
 
 static bool
 open_font (
-           const int    ptsize,
-           const char  *file_name,
-           TTF_Font   **dst,
-           const bool   check_monospace,
-           char       **err
+           const int            ptsize,
+           const unsigned int   hdpi,
+           const unsigned int   vdpi,
+           const char          *file_name,
+           TTF_Font           **dst,
+           const bool           check_monospace,
+           char               **err
            )
 {
 
-  *dst= TTF_OpenFont ( file_name, ptsize );
+  *dst= TTF_OpenFontDPI ( file_name, ptsize, hdpi, vdpi );
   if ( *dst == NULL )
     {
       msgerror ( err, "Failed to open font '%s' with point size %d",
@@ -213,35 +215,51 @@ open_fonts (
             )
 {
 
+  float f_hdpi,f_vdpi;
+  unsigned int hdpi,vdpi;
+  
+  
+  // Obté dpi.
+  if ( SDL_GetDisplayDPI ( 0, NULL, &f_hdpi, &f_vdpi ) != 0 )
+    {
+      msgerror ( err, "Failed to determine DPI display: %s",
+                 SDL_GetError () );
+      return false;
+    }
+  hdpi= (unsigned int) (f_hdpi + 0.5);
+  if ( hdpi <= 0 ) hdpi= 1;
+  vdpi= (unsigned int) (f_vdpi + 0.5);
+  if ( vdpi <= 0 ) vdpi= 1;
+  
   // Fonts normal
-  if ( !open_font ( f->_conf->font_size,
+  if ( !open_font ( f->_conf->font_size, hdpi, vdpi, 
                     f->_font_normal_roman_fn,
                     &(f->_fonts[F_NORMAL][F_ROMAN]),
                     false, err ) )
     return false;
-  if ( !open_font ( f->_conf->font_size,
+  if ( !open_font ( f->_conf->font_size, hdpi, vdpi, 
                     f->_font_normal_bold_fn,
                     &(f->_fonts[F_NORMAL][F_BOLD]),
                     false, err ) )
     return false;
-  if ( !open_font ( f->_conf->font_size,
+  if ( !open_font ( f->_conf->font_size, hdpi, vdpi, 
                     f->_font_normal_italic_fn,
                     &(f->_fonts[F_NORMAL][F_ITALIC]),
                     false, err ) )
     return false;
 
   // Fonts fixed-pitch
-  if ( !open_font ( f->_conf->font_size,
+  if ( !open_font ( f->_conf->font_size, hdpi, vdpi, 
                     f->_font_fpitch_roman_fn,
                     &(f->_fonts[F_FPITCH][F_ROMAN]),
                     true, err ) )
     return false;
-  if ( !open_font ( f->_conf->font_size,
+  if ( !open_font ( f->_conf->font_size, hdpi, vdpi, 
                     f->_font_fpitch_bold_fn,
                     &(f->_fonts[F_FPITCH][F_BOLD]),
                     true, err ) )
     return false;
-  if ( !open_font ( f->_conf->font_size,
+  if ( !open_font ( f->_conf->font_size, hdpi, vdpi, 
                     f->_font_fpitch_italic_fn,
                     &(f->_fonts[F_FPITCH][F_ITALIC]),
                     true, err ) )
@@ -329,3 +347,56 @@ fonts_new (
   return NULL;
   
 } // end fonts_new
+
+
+int
+fonts_char_height (
+                   const Fonts *f
+                   )
+{
+
+  int i,j,ret,tmp;
+  
+
+  ret= -1;
+  for ( i= 0; i < F_NUM_FONTS; ++i )
+    for ( j= 0; j < F_NUM_STYLES; ++j )
+      {
+        tmp= TTF_FontHeight ( f->_fonts[i][j] );
+        if ( tmp > ret ) ret= tmp;
+      }
+
+  return ret;
+  
+} // end fonts_char_height
+
+
+bool
+fonts_char0_width (
+                   const Fonts  *f,
+                   int          *width,
+                   char        **err
+                   )
+{
+
+  int i,minx,miny,maxx,maxy,advance,w;
+
+  
+  *width= -1;
+  for ( i= 0; i < F_NUM_STYLES; ++i )
+    {
+      if ( TTF_GlyphMetrics ( f->_fonts[F_FPITCH][i], '0',
+                              &minx, &maxx, &miny, &maxy,
+                              &advance ) )
+        {
+          msgerror ( err, "Failed to estimate char width: %s",
+                     SDL_GetError () );
+          return false;
+        }
+      w= maxx - minx;
+      if ( w > *width ) *width= w;
+    }
+  
+  return true;
+  
+} // end fonts_char0_width

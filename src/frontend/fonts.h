@@ -26,6 +26,7 @@
 #define __FRONTEND__FONTS_H__
 
 #include <glib.h>
+#include <stdbool.h>
 #include <SDL_ttf.h>
 
 #include "conf.h"
@@ -74,5 +75,17 @@ fonts_new (
            const gboolean   verbose,
            char           **err
            );
+
+int
+fonts_char_height (
+                   const Fonts *f
+                   );
+
+bool
+fonts_char0_width (
+                   const Fonts  *f,
+                   int          *width,
+                   char        **err
+                   );
 
 #endif // __FRONTEND__FONTS_H__

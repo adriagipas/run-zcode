@@ -150,7 +150,7 @@ free_opts (
 /**********************/
 /* PROGRAMA PRINCIPAL */
 /**********************/
-#include "frontend/window.h"
+#include "frontend/screen.h"
 int main ( int argc, char *argv[] )
 {
   
@@ -172,21 +172,20 @@ int main ( int argc, char *argv[] )
   conf= conf_new ( opts.verbose, opts.conf_fn, &err );
   if ( conf == NULL ) goto error;
   
-  Window *w;
+  Screen *s;
   SDL_Init ( SDL_INIT_VIDEO|SDL_INIT_EVENTS );
-  w= window_new ( 500, 500, 100, 100, "Prova", NULL, &err );
-  if ( w == NULL ) goto error;
-  window_show ( w );
+  s= screen_new ( conf, 5, "Prova", opts.verbose, &err );
+  if ( s == NULL ) goto error;
   SDL_Event event;
   bool stop= false;
   while ( !stop )
     {
-      while ( window_next_event ( w, &event ) )
+      while ( window_next_event ( s->_win, &event ) )
         if ( event.type == SDL_QUIT )
           stop= true;
       g_usleep ( 1000 );
     }
-  window_free ( w );
+  screen_free ( s );
   SDL_Quit ();
   
   // Executa.
