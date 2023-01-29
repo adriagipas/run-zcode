@@ -28,10 +28,12 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <SDL.h>
 
 #include "core/interpreter.h"
 #include "debug/debugger.h"
 #include "frontend/conf.h"
+#include "utils/error.h"
 #include "utils/log.h"
 
 
@@ -150,7 +152,7 @@ free_opts (
 /**********************/
 /* PROGRAMA PRINCIPAL */
 /**********************/
-#include "frontend/screen.h"
+
 int main ( int argc, char *argv[] )
 {
   
@@ -166,56 +168,27 @@ int main ( int argc, char *argv[] )
   err= NULL;
   intp= NULL;
   conf= NULL;
-
+  if ( SDL_Init ( SDL_INIT_VIDEO|SDL_INIT_EVENTS ) != 0 )
+    {
+      msgerror ( &err, "Failed to initialize SDL: %s", SDL_GetError () );
+      goto error;
+    }
+  
   // Parseja opcions i configuració.
   usage ( &argc, &argv, &args, &opts );
   conf= conf_new ( opts.verbose, opts.conf_fn, &err );
   if ( conf == NULL ) goto error;
   
-  Screen *s;
-  SDL_Init ( SDL_INIT_VIDEO|SDL_INIT_EVENTS );
-  s= screen_new ( conf, 5, "Prova", opts.verbose, &err );
-  if ( s == NULL ) goto error;
-  SDL_Event event;
-  bool stop= false;
-  char buf[100];
-  int count= 0;
-  int count2= 0;
-  if ( !screen_print ( s,
-                       "\n\nHola món\nEl meu nom és \n\n   Adrià!\n",
-                       &err ) ) goto error;
-  if ( !screen_print ( s,
-                       "\n\nHola món\nEl meu nom és \n\n   Adrià! ",
-                       &err ) ) goto error;
-  if ( !screen_print ( s,
-                       "ABCDEFGHIJKLM OPQRSTUVWXXabcdefghijklmnopqrstuvvwyzABCDEFGHIJKLMNOPñÇTàèíUü",
-                       &err ) ) goto error;
-  while ( !stop )
-    {
-      while ( window_next_event ( s->_win, &event ) )
-        if ( event.type == SDL_QUIT )
-          stop= true;
-      g_usleep ( 1000 );
-      if ( ++count == 10 )
-        {
-          snprintf ( buf, 100, "\nHola món! %d", count2 );
-          ++count2;
-          if ( !screen_print ( s, buf, &err ) ) goto error;
-          count= 0;
-        }
-    }
-  screen_free ( s );
-  SDL_Quit ();
-  
   // Executa.
   if ( opts.debug )
     {
-      if ( !debugger_run ( args.zcode_fn, opts.verbose, &err ) )
+      if ( !debugger_run ( args.zcode_fn, conf, opts.verbose, &err ) )
         goto error;
     }
   else
     {
-      intp= interpreter_new_from_file_name ( args.zcode_fn, NULL, &err );
+      intp= interpreter_new_from_file_name ( args.zcode_fn, conf,
+                                             opts.verbose, NULL, &err );
       if ( intp == NULL ) goto error;
       if ( !interpreter_run ( intp, &err ) ) goto error;
       interpreter_free ( intp ); intp= NULL;
@@ -225,6 +198,7 @@ int main ( int argc, char *argv[] )
   if ( !conf_write ( conf, &err ) ) goto error;
   conf_free ( conf );
   free_opts ( &opts );
+  SDL_Quit ();
   
   return EXIT_SUCCESS;
   

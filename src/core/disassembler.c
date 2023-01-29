@@ -942,6 +942,10 @@ decode_next_inst (
     case 0xb8: // ret_popped;
       ins->name= INSTRUCTION_NAME_RET_POPPED;
       break;
+
+    case 0xbb: // new_line;
+      ins->name= INSTRUCTION_NAME_NEW_LINE;
+      break;
       
     case 0xc1: // je
       if ( !read_var_ops ( ins, mem, &addr, err ) ) return false;

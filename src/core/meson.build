@@ -14,5 +14,5 @@ CORE= static_library('core',
                      'story_file.c',
                      'tracer.h',
                      include_directories: [ROOT_H],
-                     dependencies : [GLIB2])
+                     dependencies : [GLIB2,SDL2])
                      

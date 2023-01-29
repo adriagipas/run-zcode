@@ -28,9 +28,12 @@
 #include <glib.h>
 #include <stdbool.h>
 
+#include "frontend/conf.h"
+
 bool
 debugger_run (
               const char      *zcode_fn,
+              Conf            *conf,
               const gboolean   verbose,
               char           **err
               );

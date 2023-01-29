@@ -1600,6 +1600,10 @@ exec_next_inst (
       if ( !state_readvar ( intp->state, 0, &op1, err ) ) return RET_ERROR;
       if ( !ret_val ( intp, op1, err ) ) return RET_ERROR;
       break;
+
+    case 0xbb: // new_line
+      if ( !screen_print ( intp->screen, "\n", err ) ) return RET_ERROR;
+      break;
       
     case 0xc1: // je
       if ( !read_var_ops ( intp, ops, &nops, -1, err ) ) return RET_ERROR;
@@ -1767,6 +1771,7 @@ interpreter_free (
                   )
 {
 
+  if ( intp->screen != NULL ) screen_free ( intp->screen );
   if ( intp->ins != NULL ) instruction_free ( intp->ins );
   if ( intp->mem != NULL ) memory_map_free ( intp->mem );
   if ( intp->sf != NULL ) story_file_free ( intp->sf );
@@ -1778,9 +1783,11 @@ interpreter_free (
 
 Interpreter *
 interpreter_new_from_file_name (
-                                const char  *file_name,
-                                Tracer      *tracer,
-                                char       **err
+                                const char      *file_name,
+                                Conf            *conf,
+                                const gboolean   verbose,
+                                Tracer          *tracer,
+                                char           **err
                                 )
 {
 
@@ -1794,6 +1801,7 @@ interpreter_new_from_file_name (
   ret->mem= NULL;
   ret->ins= NULL;
   ret->tracer= tracer;
+  ret->screen= NULL;
 
   // Obri story file
   ret->sf= story_file_new_from_file_name ( file_name, err );
@@ -1824,6 +1832,19 @@ interpreter_new_from_file_name (
     (((uint32_t) ret->mem->sf_mem[0xa])<<8) |
     ((uint32_t) ret->mem->sf_mem[0xb])
     ;
+
+  // Inicialitza pantalla
+  if ( ret->version == 6 )
+    {
+      msgerror ( err, "Screen model V6 not supported" );
+      goto error;
+    }
+  else
+    {
+      ret->screen= screen_new ( conf, ret->version, "Prova",
+                                verbose, err );
+      if ( ret->screen == NULL ) goto error;
+    }
   
   return ret;
 

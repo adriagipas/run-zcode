@@ -25,6 +25,7 @@
 #ifndef __CORE__INTERPRETER_H__
 #define __CORE__INTERPRETER_H__
 
+#include <glib.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -35,6 +36,9 @@
 #include "story_file.h"
 #include "tracer.h"
 
+#include "frontend/conf.h"
+#include "frontend/screen.h"
+
 typedef struct
 {
 
@@ -44,6 +48,7 @@ typedef struct
   MemoryMap    *mem;
   Instruction  *ins;
   Tracer       *tracer; // Pot ser NULL.
+  Screen       *screen;
   
   // Altres
   uint8_t version;
@@ -60,9 +65,11 @@ interpreter_free (
 
 Interpreter *
 interpreter_new_from_file_name (
-                                const char  *file_name,
-                                Tracer      *tracer, // Pot ser NULL
-                                char       **err
+                                const char      *file_name,
+                                Conf            *conf,
+                                const gboolean   verbose,
+                                Tracer          *tracer, // Pot ser NULL
+                                char           **err
                                 );
 
 // Torna cert si tot ha anat bé.

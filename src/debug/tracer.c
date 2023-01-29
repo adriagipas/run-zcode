@@ -86,6 +86,7 @@ get_inst_name (
     case INSTRUCTION_NAME_LOADW           : return "loadw           ";
     case INSTRUCTION_NAME_MOD             : return "mod             ";
     case INSTRUCTION_NAME_MUL             : return "mul             ";
+    case INSTRUCTION_NAME_NEW_LINE        : return "new_line        ";
     case INSTRUCTION_NAME_OR              : return "or              ";
     case INSTRUCTION_NAME_PULL            : return "pull            ";
     case INSTRUCTION_NAME_PUT_PROP        : return "put_prop        ";
