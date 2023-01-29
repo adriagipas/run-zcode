@@ -536,3 +536,61 @@ window_raise (
   SDL_RaiseWindow ( win->_win );
   
 } // end window_raise
+
+
+uint32_t
+window_get_color (
+                  const Window *win,
+                  const uint8_t r,
+                  const uint8_t g,
+                  const uint8_t b
+                  )
+{
+
+  uint32_t ret;
+
+  
+  if ( win->_desp_a == 32 )
+    ret=
+      (r<<win->_desp_r) |
+      (g<<win->_desp_g) |
+      (b<<win->_desp_b);
+  else
+    ret=
+      (r<<win->_desp_r) |
+      (g<<win->_desp_g) |
+      (b<<win->_desp_b) |
+      (0xff<<win->_desp_a);
+  
+  return ret;
+  
+} // end window_get_color
+
+
+SDL_Surface *
+window_get_surface (
+                    const Window  *win,
+                    const int      width,
+                    const int      height,
+                    char         **err
+                    )
+{
+  
+  SDL_Surface *ret;
+  
+  
+  ret= SDL_CreateRGBSurface ( 0, width, height, 32,
+                              0x000000ff<<win->_desp_r,
+                              0x000000ff<<win->_desp_g,
+                              0x000000ff<<win->_desp_b,
+                              win->_desp_a==32 ? 0 :
+                              (0x000000ff<<win->_desp_a) );
+  if ( ret == NULL )
+    {
+      msgerror ( err, "Failed to create SDL surface: %s", SDL_GetError () );
+      return NULL;
+    }
+  
+  return ret;
+  
+} // end window_get_surface

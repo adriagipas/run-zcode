@@ -178,12 +178,31 @@ int main ( int argc, char *argv[] )
   if ( s == NULL ) goto error;
   SDL_Event event;
   bool stop= false;
+  char buf[100];
+  int count= 0;
+  int count2= 0;
+  if ( !screen_print ( s,
+                       "\n\nHola món\nEl meu nom és \n\n   Adrià!\n",
+                       &err ) ) goto error;
+  if ( !screen_print ( s,
+                       "\n\nHola món\nEl meu nom és \n\n   Adrià! ",
+                       &err ) ) goto error;
+  if ( !screen_print ( s,
+                       "ABCDEFGHIJKLM OPQRSTUVWXXabcdefghijklmnopqrstuvvwyzABCDEFGHIJKLMNOPñÇTàèíUü",
+                       &err ) ) goto error;
   while ( !stop )
     {
       while ( window_next_event ( s->_win, &event ) )
         if ( event.type == SDL_QUIT )
           stop= true;
       g_usleep ( 1000 );
+      if ( ++count == 10 )
+        {
+          snprintf ( buf, 100, "\nHola món! %d", count2 );
+          ++count2;
+          if ( !screen_print ( s, buf, &err ) ) goto error;
+          count= 0;
+        }
     }
   screen_free ( s );
   SDL_Quit ();

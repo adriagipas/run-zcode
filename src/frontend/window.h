@@ -128,4 +128,21 @@ window_raise (
               Window *win
               );
 
+uint32_t
+window_get_color (
+                  const Window *win,
+                  const uint8_t r,
+                  const uint8_t g,
+                  const uint8_t b
+                  );
+
+// Crea un surface amb el format que utilitza la finestra.
+SDL_Surface *
+window_get_surface (
+                    const Window  *win,
+                    const int      width,
+                    const int      height,
+                    char         **err
+                    );
+
 #endif // __FRONTEND__WINDOW_H__

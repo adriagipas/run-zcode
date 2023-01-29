@@ -26,10 +26,45 @@
 #define __FRONTEND__SCREEN_H__
 
 #include <glib.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <SDL.h>
 
 #include "conf.h"
 #include "fonts.h"
 #include "window.h"
+
+// Desa estat per a renderitzat en cada cursor. En realitat desa
+// informació sobre l'últim tros de de text renderitzat per a poder
+// re-renderitzar si es continuen afegint caràcters a la paraula.
+typedef struct
+{
+
+  // Estil actual
+  int       font;
+  int       style;
+  uint16_t  fg_color;
+  uint16_t  bg_color;
+
+  // Posició
+  int       line;
+  int       x; // En píxels.
+  int       width; // Píxels que ocupa el text actual
+
+  // Contingut.
+  char     *text; // Inclou '\0'
+  size_t    size; // Memòria reserva en text
+  size_t    N;    // Nombre de bytes (no inclou '\0')
+  size_t    Nc;   // Nombre de caràcters UTF-8 (no inclou '\0')
+
+  // Altres
+  bool buffered; // En realitat el que fa és que si és true intenta no
+                 // tallar paraules quan no cap
+  bool space;    // Indica que l'últim caràcter imprés era un espai.
+  
+} ScreenCursor;
+
 
 typedef struct
 {
@@ -46,6 +81,31 @@ typedef struct
   int _height,_width; // En píxels
   int _line_height; // En píxels
   int _char_width; // En píxels
+
+  // Frame buffer
+  uint32_t *_fb;
+  uint16_t  _bg_color;
+  uint16_t  _fg_color;
+  bool      _reverse_color;
+
+  // Finestres i altres.
+  int          _upwin_lines;
+  int          _current_win;
+  int          _current_font;  // Efectiva, no la seleccionada
+  int          _current_style; // Efectiva, no la seleccionada
+  ScreenCursor _cursors[2];
+
+  // Tokenitzer text
+  struct
+  {
+    char   *buf;
+    size_t  size;
+    char   *p;
+    bool    nl_buffered;
+  } _split;
+
+  // Altres
+  SDL_Surface *_render_buf;
   
 } Screen;
 
@@ -63,5 +123,12 @@ screen_new (
             const gboolean   verbose,
             char           **err
             );
+
+bool
+screen_print (
+              Screen      *screen,
+              const char  *text,
+              char       **err
+              );
 
 #endif // __FRONTEND__SCREEN_H__
