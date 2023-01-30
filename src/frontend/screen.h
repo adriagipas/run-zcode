@@ -131,4 +131,7 @@ screen_print (
               char       **err
               );
 
+#define screen_GET_LINES(SCREEN) ((SCREEN)->_lines)
+#define screen_GET_WIDTH_CHARS(SCREEN) ((SCREEN)->_width_chars)
+
 #endif // __FRONTEND__SCREEN_H__

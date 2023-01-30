@@ -33,6 +33,7 @@
 
 #include "story_file.h"
 #include "tracer.h"
+#include "frontend/screen.h"
 
 #define STACK_SIZE 0xFFFF
 
@@ -78,7 +79,8 @@ struct _State
   // Camps privats
   const StoryFile *sf;
   Tracer          *tracer; // Pot ser NULL
-
+  const Screen    *screen;
+  
   // Callbacks.
   bool (*writevar) (State *,const uint8_t,const uint16_t,char **);
   bool (*readvar) (State *,const uint8_t,uint16_t *,char **);
@@ -92,9 +94,10 @@ state_free (
 
 State *
 state_new (
-           StoryFile  *sf,
-           Tracer     *tracer, // Pot ser NULL
-           char      **err
+           StoryFile     *sf,
+           const Screen  *screen,
+           Tracer        *tracer, // Pot ser NULL
+           char         **err
            );
 
 // Torna cert si tot ha anat bé. El nombre de variables locals no pot

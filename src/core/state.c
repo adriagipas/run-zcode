@@ -50,8 +50,10 @@ reset_header_values (
 {
 
   uint8_t version;
-
-
+  int tmp;
+  uint16_t tmp16;
+  
+  
   version= state->sf->data[0];
 
   // 0x01: Flags 1
@@ -113,8 +115,10 @@ reset_header_values (
   // 0x21: Screen width (characters)
   if ( version >= 4 )
     {
-      ww ( "[Header] Screen height - Not implemented" );
-      ww ( "[Header] Screen width - Not implemented" );
+      tmp= screen_GET_LINES ( state->screen );
+      state->mem[0x20]= (uint8_t) (tmp>255 ? 255 : tmp);
+      tmp= screen_GET_WIDTH_CHARS ( state->screen );
+      state->mem[0x21]= (uint8_t) (tmp>255 ? 255 : tmp);
     }
 
   // 0x22: Screen width in units
@@ -123,19 +127,25 @@ reset_header_values (
   // 0x27: Font height / width in units
   if ( version >= 5 )
     {
-      ww ( "[Header] Screen width in units - Not implemented" );
-      ww ( "[Header] Screen height in units - Not implemented" );
       if ( version == 6 )
         {
+          ww ( "[Header] Screen width in units - Not implemented" );
+          ww ( "[Header] Screen height in units - Not implemented" );
           ww ( "[Header] Font height in units - Not implemented" );
           ww ( "[Header] Font width in units (defined as width of a '0')"
                " - Not implemented" );
         }
       else
         {
-          ww ( "[Header] Font width in units (defined as width of a '0')"
-               " - Not implemented" );
-          ww ( "[Header] Font height in units - Not implemented" );
+          // En aquesta versió seguisc l'aproximació de 1x1.
+          tmp16= screen_GET_WIDTH_CHARS ( state->screen );
+          state->mem[0x22]= (uint8_t) (tmp16>>8);
+          state->mem[0x23]= (uint8_t) (tmp16);
+          tmp16= screen_GET_LINES ( state->screen );
+          state->mem[0x24]= (uint8_t) (tmp16>>8);
+          state->mem[0x25]= (uint8_t) (tmp16);
+          state->mem[0x26]= 1;
+          state->mem[0x27]= 1;
         }
     }
 
@@ -143,8 +153,8 @@ reset_header_values (
   // 0x2D: Default foreground colour
   if ( version >= 5 )
     {
-      ww ( "[Header] Default background colour - Not implemented" );
-      ww ( "[Header] Default foreground colour - Not implemented" );
+      state->mem[0x2c]= 9; // white
+      state->mem[0x2d]= 2; // black
     }
   
 } // end reset_header_values
@@ -808,9 +818,10 @@ state_free (
 
 State *
 state_new (
-           StoryFile  *sf,
-           Tracer     *tracer,
-           char      **err
+           StoryFile     *sf,
+           const Screen  *screen,
+           Tracer        *tracer,
+           char         **err
            )
 {
 
@@ -824,6 +835,7 @@ state_new (
   ret->sf= sf;
   ret->tracer= tracer;
   ret->frame_ind= 0;
+  ret->screen= screen;
   
   // Crea memòria dinàmica.
   version= sf->data[0];

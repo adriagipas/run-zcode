@@ -1527,6 +1527,23 @@ exec_next_inst (
       state->PC+= (uint32_t) U16_S32(op1);
       break;
 
+    case 0x8f: // call_1n / not
+      if ( intp->version >= 5 )
+        {
+          ops[0].u16.type= OP_LARGE;
+          if ( !memory_map_READW ( intp->mem, intp->state->PC,
+                                   &(ops[0].u16.val), true, err ) )
+            return RET_ERROR;
+          intp->state->PC+= 2;
+          if ( !call_routine ( intp, ops, 1, 0, true, err ) )
+            return RET_ERROR;
+        }
+      else
+        {
+          msgerror ( err, "@not not implemented in version %d", intp->version );
+          return RET_ERROR;
+        }
+      break;
     case 0x90: // jz
       if ( !memory_map_READB ( intp->mem, state->PC++, &op1_u8, true, err ) )
         return RET_ERROR;
@@ -1563,6 +1580,23 @@ exec_next_inst (
       state->PC+= ((uint32_t) U16_S32(op1))-2;
       break;
       
+    case 0x9f: // call_1n / not
+      if ( intp->version >= 5 )
+        {
+          ops[0].u8.type= OP_SMALL;
+          if ( !memory_map_READB ( intp->mem, intp->state->PC++,
+                                   &(ops[0].u8.val), true, err ) )
+            return RET_ERROR;
+          if ( !call_routine ( intp, ops, 1, 0, true, err ) )
+            return RET_ERROR;
+        }
+      else
+        {
+          msgerror ( err, "@not not implemented in version %d", intp->version );
+          return RET_ERROR;
+        }
+      break;
+      
     case 0xa0: // jz
       if ( !read_op1_var ( intp, &op1, err ) ) return RET_ERROR;
       if ( !branch ( intp, op1 == 0, err ) ) return RET_ERROR;
@@ -1592,6 +1626,22 @@ exec_next_inst (
       state->PC+= ((uint32_t) U16_S32(op1))-2;
       break;
 
+    case 0xaf: // call_1n / not
+      if ( intp->version >= 5 )
+        {
+          ops[0].u8.type= OP_VARIABLE;
+          if ( !memory_map_READB ( intp->mem, intp->state->PC++,
+                                   &(ops[0].u8.val), true, err ) )
+            return RET_ERROR;
+          if ( !call_routine ( intp, ops, 1, 0, true, err ) )
+            return RET_ERROR;
+        }
+      else
+        {
+          msgerror ( err, "@not not implemented in version %d", intp->version );
+          return RET_ERROR;
+        }
+      break;
     case 0xb0: // rtrue
       if ( !ret_val ( intp, 1, err ) ) return RET_ERROR;
       break;
@@ -1807,10 +1857,23 @@ interpreter_new_from_file_name (
   ret->sf= story_file_new_from_file_name ( file_name, err );
   if ( ret->sf == NULL ) goto error;
 
+  // Inicialitza pantalla
+  if ( ret->sf->data[0] == 6 )
+    {
+      msgerror ( err, "Screen model V6 not supported" );
+      goto error;
+    }
+  else
+    {
+      ret->screen= screen_new ( conf, ret->sf->data[0], "Prova",
+                                verbose, err );
+      if ( ret->screen == NULL ) goto error;
+    }
+  
   // Crea estat.
-  ret->state= state_new ( ret->sf, tracer, err );
+  ret->state= state_new ( ret->sf, ret->screen, tracer, err );
   if ( ret->state == NULL ) goto error;
-
+  
   // Inicialitza mapa de memòria.
   ret->mem= memory_map_new ( ret->sf, ret->state, tracer, err );
   if ( ret == NULL ) goto error;
@@ -1832,19 +1895,6 @@ interpreter_new_from_file_name (
     (((uint32_t) ret->mem->sf_mem[0xa])<<8) |
     ((uint32_t) ret->mem->sf_mem[0xb])
     ;
-
-  // Inicialitza pantalla
-  if ( ret->version == 6 )
-    {
-      msgerror ( err, "Screen model V6 not supported" );
-      goto error;
-    }
-  else
-    {
-      ret->screen= screen_new ( conf, ret->version, "Prova",
-                                verbose, err );
-      if ( ret->screen == NULL ) goto error;
-    }
   
   return ret;
 

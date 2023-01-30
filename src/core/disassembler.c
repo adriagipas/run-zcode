@@ -879,6 +879,17 @@ decode_next_inst (
         return false;
       break;
 
+    case 0x8f: // call_1n
+      if ( mem->sf_mem[0] >= 5 )
+        {
+          if ( !ins_1op ( ins, mem, &addr, INSTRUCTION_NAME_CALL, err ) )
+            return false;
+        }
+      else
+        {
+          // TODO !!
+        }
+      break;
     case 0x90: // jz
       if ( !ins_1op_branch ( ins, mem, &addr, INSTRUCTION_NAME_JZ, err ) )
         return false;
@@ -907,6 +918,17 @@ decode_next_inst (
         return false;
       break;
 
+    case 0x9f: // call_1n
+      if ( mem->sf_mem[0] >= 5 )
+        {
+          if ( !ins_1op ( ins, mem, &addr, INSTRUCTION_NAME_CALL, err ) )
+            return false;
+        }
+      else
+        {
+          // TODO !!
+        }
+      break;
     case 0xa0: // jz
       if ( !ins_1op_branch ( ins, mem, &addr, INSTRUCTION_NAME_JZ, err ) )
         return false;
@@ -934,7 +956,18 @@ decode_next_inst (
       if ( !ins_1op ( ins, mem, &addr, INSTRUCTION_NAME_JUMP, err ) )
         return false;
       break;
-      
+
+    case 0xaf: // call_1n
+      if ( mem->sf_mem[0] >= 5 )
+        {
+          if ( !ins_1op ( ins, mem, &addr, INSTRUCTION_NAME_CALL, err ) )
+            return false;
+        }
+      else
+        {
+          // TODO !!
+        }
+      break;
     case 0xb0: // ret_popped;
       ins->name= INSTRUCTION_NAME_RTRUE;
       break;
