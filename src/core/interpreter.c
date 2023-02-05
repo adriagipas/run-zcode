@@ -698,6 +698,33 @@ read_op1_var_store (
 
 
 static bool
+ret_val (
+         Interpreter     *intp,
+         const uint16_t   val,
+         char           **err
+         )
+{
+
+  bool discard;
+  uint8_t res_var;
+  
+  
+  discard= FRAME_DISCARD_RES(intp->state);
+  res_var= (uint8_t) FRAME_NUM_RES(intp->state);
+  if ( !state_free_frame ( intp->state, err ) )
+    return false;
+  if ( !discard )
+    {
+      if ( !state_writevar ( intp->state, res_var, val, err ) )
+        return false;
+    }
+  
+  return true;
+  
+} // end ret_val
+
+
+static bool
 branch (
         Interpreter  *intp,
         const bool    cond,
@@ -730,9 +757,13 @@ branch (
   if ( cond == cond_value )
     {
       if ( offset == 0 )
-        ee ( "CAL_IMPLEMENTAR return false" );
+        {
+          if ( !ret_val ( intp, 0, err ) ) return false;
+        }
       else if ( offset == 1 )
-        ee ( "CAL_IMPLEMENTAR return true" );
+        {
+          if ( !ret_val ( intp, 1, err ) ) return false;
+        }
       else
         state->PC+= offset-2;
     }
@@ -840,7 +871,7 @@ get_prop_addr_len (
           return false;
         if ( b0&0x80 )
           {
-            if ( !memory_map_READB ( intp->mem, offset, &b1, false, err ) )
+            if ( !memory_map_READB ( intp->mem, offset+1, &b1, false, err ) )
               return false;
             prop_num= b0&0x3f;
             prop_len= b1&0x3f;
@@ -925,6 +956,49 @@ get_prop (
 
 
 static bool
+get_prop_len (
+              Interpreter     *intp,
+              const uint16_t   addr,
+              uint8_t         *len,
+              char           **err
+              )
+{
+
+  uint8_t b0;
+  
+  
+  // Cas especial.
+  if ( addr == 0 )
+    {
+      *len= 0;
+      return true;
+    }
+  
+  // Busca propietat (Està sempre en el byte anterior de data)
+  if ( intp->version <= 3 )
+    {
+      if ( !memory_map_READB ( intp->mem, addr-1, &b0, false, err ) )
+        return false;
+      *len= (b0>>5)+1;
+    }
+  else
+    {
+      if ( !memory_map_READB ( intp->mem, addr-1, &b0, false, err ) )
+        return false;
+      if ( b0&0x80 )
+        {
+          *len= b0&0x3f;
+          if ( *len == 0 ) *len= 64;
+        }
+      else *len= (b0&0x40)!=0 ? 2 : 1;
+    }
+  
+  return true;
+  
+} // end get_prop_len
+
+
+static bool
 put_prop (
           Interpreter     *intp,
           const uint16_t   object,
@@ -964,6 +1038,44 @@ put_prop (
   return true;
   
 } // end put_prop
+
+
+static bool
+test_attr (
+           Interpreter     *intp,
+           const uint16_t   object,
+           const uint16_t   attr,
+           bool            *ret,
+           char           **err
+           )
+{
+
+  uint32_t object_offset,offset;
+  uint8_t mask,val;
+  
+
+  // Comprova rang
+  if ( (intp->version <= 3 && attr >= 32) || (intp->version > 3 && attr >= 48) )
+    {
+      msgerror ( err, "Failed to test object attribute: %u is out of range",
+                 attr );
+      return false;
+    }
+  
+  // Obté object offset
+  if ( !get_object_offset ( intp, object, &object_offset, err ) )
+    return false;
+
+  // Comprova atribut.
+  offset= object_offset + attr/8;
+  mask= 1<<(7-(attr%8));
+  if ( !memory_map_READB ( intp->mem, offset, &val, false, err ) )
+    return false;
+  *ret= (val&mask)!=0;
+  
+  return true;
+  
+} // end test_attr
 
 
 static bool
@@ -1012,33 +1124,6 @@ jin (
 
 
 static bool
-ret_val (
-         Interpreter     *intp,
-         const uint16_t   val,
-         char           **err
-         )
-{
-
-  bool discard;
-  uint8_t res_var;
-  
-  
-  discard= FRAME_DISCARD_RES(intp->state);
-  res_var= (uint8_t) FRAME_NUM_RES(intp->state);
-  if ( !state_free_frame ( intp->state, err ) )
-    return false;
-  if ( !discard )
-    {
-      if ( !state_writevar ( intp->state, res_var, val, err ) )
-        return false;
-    }
-  
-  return true;
-  
-} // end ret_val
-
-
-static bool
 text_add (
           Interpreter  *intp,
           const char    c,
@@ -1074,19 +1159,20 @@ zscii2utf8 (
             const uint32_t   addr,
             uint32_t        *ret_addr, // Pot ser NULL
             const bool       hmem_allowed,
+            const bool       is_abbr,
             char           **err
             )
 {
 
-  uint16_t word;
-  uint32_t caddr;
+  uint16_t word,abbr_addr;
+  uint32_t caddr,tmp_addr;
   int alph,i,abbr_ind,prev_alph;
   uint8_t zc;
   bool end,lock_alph;
   
   
   prev_alph= alph= 0;
-  intp->text.N= 0;
+  if ( !is_abbr ) intp->text.N= 0;
   abbr_ind= 0;
   lock_alph= false;
   caddr= addr;
@@ -1096,7 +1182,7 @@ zscii2utf8 (
     if ( !memory_map_READW ( intp->mem, caddr, &word, hmem_allowed, err ) )
       return false;
     caddr+= 2;
-
+    
     // Descodifica
     end= (word&0x8000)!=0;
     for ( i= 0; i < 3; ++i )
@@ -1156,7 +1242,19 @@ zscii2utf8 (
         // Abbreviatures
         else if ( abbr_ind != 0 )
           {
-            ee ( "CAL IMPLEMENTAR ABREVIATURES!!!" );
+            if ( is_abbr )
+              {
+                msgerror ( err, "Failed to print abbreviation: "
+                           "found abbreviation inside abbreviation" );
+                return false;
+              }
+            tmp_addr= intp->abbr_table_addr + (32*(abbr_ind-1) + zc)*2;
+            if ( !memory_map_READW ( intp->mem, tmp_addr, &abbr_addr,
+                                     false, err ) )
+              return false;
+            if ( !zscii2utf8 ( intp, ((uint32_t) abbr_addr)<<1, NULL,
+                               false, true, err ) )
+              return false;
             abbr_ind= 0;
           }
         
@@ -1185,7 +1283,7 @@ zscii2utf8 (
       }
     
   } while ( !end );
-  if ( !text_add ( intp, '\0', err ) ) return false;
+  if ( !is_abbr ) if ( !text_add ( intp, '\0', err ) ) return false;
   if ( ret_addr != NULL ) *ret_addr= caddr;
   
   return true;
@@ -1203,11 +1301,10 @@ print_addr (
             )
 {
 
-  if ( !zscii2utf8 ( intp, addr, ret_addr, hmem_allowed, err ) )
+  if ( !zscii2utf8 ( intp, addr, ret_addr, hmem_allowed, false, err ) )
     return false;
   if ( !screen_print ( intp->screen, intp->text.v, err ) )
     return false;
-  g_usleep ( 2000000 ); // <--- REMOVE
   
   return true;
   
@@ -1261,11 +1358,80 @@ print_num (
     }
   if ( !screen_print ( intp->screen, intp->text.v, err ) )
     return false;
-  g_usleep ( 2000000 ); // <--- REMOVE
   
   return true;
   
 } // end print_num
+
+
+static bool
+print_char (
+            Interpreter     *intp,
+            const uint16_t   val,
+            char           **err
+            )
+{
+
+  int16_t zc;
+  
+
+  // Prepara
+  zc= (int16_t) val;
+  intp->text.N= 0;
+
+  // Descodifica caràcter
+  if ( zc < 0 ) goto wrong_zc;
+  else if ( zc < 32 ) // Alguns caràcters especials
+    {
+      if ( zc == 0 )
+        {
+          if ( !text_add ( intp, '\0', err ) ) return false;
+        }
+      else if ( zc == 9 )
+        {
+          if ( intp->version == 6 )
+            {
+              if ( !text_add ( intp, '\t', err ) ) return false;
+            }
+          else goto wrong_zc;
+        }
+      else if ( zc == 11 ) // Sentence space???
+        {
+          if ( intp->version == 6 )
+            {
+              if ( !text_add ( intp, ' ', err ) ) return false;
+            }
+          else goto wrong_zc;
+        }
+      else if ( zc == 13 )
+        {
+          if ( !text_add ( intp, '\n', err ) ) return false;
+        }
+      else goto wrong_zc;
+    }
+  else if ( zc < 127 ) // standard ASCII
+    {
+      if ( !text_add ( intp, (char) zc, err ) ) return false;
+    }
+  else if ( zc < 155 ) goto wrong_zc;
+  else if ( zc < 252 ) // extra characters
+    {
+      ee ( "CAL IMPLEMENTAR extra characters" );
+    }
+  else goto wrong_zc;
+  if ( !text_add ( intp, '\0', err ) ) return false;
+
+  // Imprimeix
+  if ( !screen_print ( intp->screen, intp->text.v, err ) )
+    return false;
+  
+  return true;
+
+ wrong_zc:
+  msgerror ( err, "Failed to print character: invalid code %d", zc );
+  return false;
+  
+} // end print_char
 
 
 static int
@@ -1332,6 +1498,13 @@ exec_next_inst (
       SET_U8TOU16(op2_u8,op2);
       res= op1 & op2;
       if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
+      break;
+    case 0x0a: // test_attr
+      if ( !read_small_small ( intp, &op1_u8, &op2_u8, err ) ) return RET_ERROR;
+      SET_U8TOU16(op1_u8,op1);
+      SET_U8TOU16(op2_u8,op2);
+      if ( !test_attr ( intp, op1, op2, &cond, err ) ) return RET_ERROR;
+      if ( !branch ( intp, cond, err ) ) return RET_ERROR;
       break;
       
     case 0x0d: // store
@@ -1459,6 +1632,12 @@ exec_next_inst (
       res= op1 & op2;
       if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
       break;
+    case 0x2a: // test_attr
+      if ( !read_small_var ( intp, &op1_u8, &op2, err ) ) return RET_ERROR;
+      SET_U8TOU16(op1_u8,op1);
+      if ( !test_attr ( intp, op1, op2, &cond, err ) ) return RET_ERROR;
+      if ( !branch ( intp, cond, err ) ) return RET_ERROR;
+      break;
       
     case 0x2d: // store
       if ( !read_small_var ( intp, &op1_u8, &op2, err ) ) return RET_ERROR;
@@ -1575,6 +1754,12 @@ exec_next_inst (
       res= op1 & op2;
       if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
       break;
+    case 0x4a: // test_attr
+      if ( !read_var_small ( intp, &op1, &op2_u8, err ) ) return RET_ERROR;
+      SET_U8TOU16(op2_u8,op2);
+      if ( !test_attr ( intp, op1, op2, &cond, err ) ) return RET_ERROR;
+      if ( !branch ( intp, cond, err ) ) return RET_ERROR;
+      break;
       
     case 0x4d: // store
       if ( !read_small_small ( intp, &op1_u8, &op2_u8, err ) ) return RET_ERROR;
@@ -1686,6 +1871,11 @@ exec_next_inst (
       res= op1 & op2;
       if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
       break;
+    case 0x6a: // test_attr
+      if ( !read_var_var ( intp, &op1, &op2, err ) ) return RET_ERROR;
+      if ( !test_attr ( intp, op1, op2, &cond, err ) ) return RET_ERROR;
+      if ( !branch ( intp, cond, err ) ) return RET_ERROR;
+      break;
       
     case 0x6d: // store
       if ( !read_small_var ( intp, &op1_u8, &op2, err ) ) return RET_ERROR;
@@ -1762,12 +1952,25 @@ exec_next_inst (
       if ( !branch ( intp, op1 == 0, err ) ) return RET_ERROR;
       break;
 
+    case 0x84: // get_prop_len
+      if ( !read_op1_large_store ( intp, &op1, &result_var, err ) )
+        return RET_ERROR;
+      if ( !get_prop_len ( intp, op1, &res_u8, err ) ) return RET_ERROR;
+      res= (uint8_t) res_u8;
+      if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
+      break;
     case 0x85: // inc
       msgerror ( err, "Failed to execute @inc: Trying to reference"
                  " a variable with a large constant" );
       return RET_ERROR;
       break;
 
+    case 0x87: // print_addr
+      if ( !memory_map_READW ( intp->mem, state->PC, &op1, true, err ) )
+        return RET_ERROR;
+      state->PC+= 2;
+      if ( !print_addr ( intp, op1, NULL, false, err ) ) return RET_ERROR;
+      break;
     case 0x88: // call_1s
       if ( intp->version < 4 ) goto wrong_version;
       ops[0].u16.type= OP_LARGE;
@@ -1818,6 +2021,14 @@ exec_next_inst (
       if ( !branch ( intp, op1_u8 == 0, err ) ) return RET_ERROR;
       break;
 
+    case 0x94: // get_prop_len
+      if ( !read_op1_small_store ( intp, &op1_u8, &result_var, err ) )
+        return RET_ERROR;
+      SET_U8TOU16(op1_u8,op1);
+      if ( !get_prop_len ( intp, op1, &res_u8, err ) ) return RET_ERROR;
+      res= (uint8_t) res_u8;
+      if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
+      break;
     case 0x95: // inc
       if ( !memory_map_READB ( intp->mem, state->PC++, &op1_u8, true, err ) )
         return RET_ERROR;
@@ -1825,7 +2036,13 @@ exec_next_inst (
       ++op1;
       if ( !write_var ( intp, op1_u8, op1, err ) ) return RET_ERROR;
       break;
-      
+
+    case 0x97: // print_addr
+      if ( !memory_map_READB ( intp->mem, state->PC++, &op1_u8, true, err ) )
+        return RET_ERROR;
+      SET_U8TOU16(op1_u8,op1);
+      if ( !print_addr ( intp, op1, NULL, false, err ) ) return RET_ERROR;
+      break;
     case 0x98: // call_1s
       if ( intp->version < 4 ) goto wrong_version;
       ops[0].u8.type= OP_SMALL;
@@ -1876,12 +2093,23 @@ exec_next_inst (
       if ( !branch ( intp, op1 == 0, err ) ) return RET_ERROR;
       break;
 
+    case 0xa4: // get_prop_len
+      if ( !read_op1_var_store ( intp, &op1, &result_var, err ) )
+        return RET_ERROR;
+      if ( !get_prop_len ( intp, op1, &res_u8, err ) ) return RET_ERROR;
+      res= (uint8_t) res_u8;
+      if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
+      break;
     case 0xa5: // inc. NOTA!! Açò és possible?
       msgerror ( err, "Failed to execute @inc: Trying to reference"
                  " a variable with a variable" );
       return RET_ERROR;
       break;
-      
+
+    case 0xa7: // print_addr
+      if ( !read_op1_var ( intp, &op1, err ) ) return RET_ERROR;
+      if ( !print_addr ( intp, op1, NULL, false, err ) ) return RET_ERROR;
+      break;
     case 0xa8: // call_1s
       if ( intp->version < 4 ) goto wrong_version;
       ops[0].u8.type= OP_VARIABLE;
@@ -1954,6 +2182,14 @@ exec_next_inst (
           if ( op1 == op2 ) cond= true;
         }
       if ( !branch ( intp, cond, err ) ) return RET_ERROR;
+      break;
+
+    case 0xc3: // jg
+      if ( !read_var_ops ( intp, ops, &nops, 2, err ) ) return RET_ERROR;
+      if ( !op_to_u16 ( intp, &(ops[0]), &op1, err ) ) return RET_ERROR;
+      if ( !op_to_u16 ( intp, &(ops[1]), &op2, err ) ) return RET_ERROR;
+      if ( !branch ( intp, ((int16_t) op1) > ((int16_t) op2), err ) )
+        return RET_ERROR;
       break;
       
     case 0xc9: // and
@@ -2043,13 +2279,26 @@ exec_next_inst (
       if ( !op_to_u16 ( intp, &(ops[2]), &op3, err ) ) return RET_ERROR;
       if ( !put_prop ( intp, op1, op2, op3, err ) ) return RET_ERROR;
       break;
-
+    case 0xe4: // sread
+      g_usleep ( 20000000 ); // <--- REMOVE
+      ee ( "CAL IMPLEMENTAR sread" );
+      break;
+    case 0xe5: // print_char
+      if ( !read_var_ops ( intp, ops, &nops, 1, err ) ) return RET_ERROR;
+      if ( !op_to_u16 ( intp, &(ops[0]), &op1, err ) ) return RET_ERROR;
+      if ( !print_char ( intp, op1, err ) ) return RET_ERROR;
+      break;
     case 0xe6: // print_num
       if ( !read_var_ops ( intp, ops, &nops, 1, err ) ) return RET_ERROR;
       if ( !op_to_u16 ( intp, &(ops[0]), &op1, err ) ) return RET_ERROR;
       if ( !print_num ( intp, op1, err ) ) return RET_ERROR;
       break;
-      
+
+    case 0xe8: // push
+      if ( !read_var_ops ( intp, ops, &nops, 1, err ) ) return RET_ERROR;
+      if ( !op_to_u16 ( intp, &(ops[0]), &op1, err ) ) return RET_ERROR;
+      if ( !write_var ( intp, 0, op1, err ) ) return RET_ERROR;
+      break;
     case 0xe9: // pull
       if ( intp->version == 6 )
         {
@@ -2207,6 +2456,14 @@ interpreter_new_from_file_name (
         ;
     }
   else ret->alphabet_table_addr= 0;
+  if ( ret->version >= 2 )
+    {
+      ret->abbr_table_addr=
+        (((uint32_t) ret->mem->sf_mem[0x18])<<8) |
+        ((uint32_t) ret->mem->sf_mem[0x19])
+        ;
+    }
+  else ret->abbr_table_addr= 0;
   ret->text.size= 8; // Té prou espai per a imprimir un número 16bit
                      // amb signe
   ret->text.v= g_new ( char, ret->text.size );

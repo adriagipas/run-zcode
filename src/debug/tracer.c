@@ -75,6 +75,7 @@ get_inst_name (
     case INSTRUCTION_NAME_DIV             : return "div             ";
     case INSTRUCTION_NAME_GET_PROP        : return "get_prop        ";
     case INSTRUCTION_NAME_GET_PROP_ADDR   : return "get_prop_addr   ";
+    case INSTRUCTION_NAME_GET_PROP_LEN    : return "get_prop_len    ";
     case INSTRUCTION_NAME_INC             : return "inc             ";
     case INSTRUCTION_NAME_JE              : return "je              ";
     case INSTRUCTION_NAME_JG              : return "jg              ";
@@ -89,9 +90,12 @@ get_inst_name (
     case INSTRUCTION_NAME_NEW_LINE        : return "new_line        ";
     case INSTRUCTION_NAME_OR              : return "or              ";
     case INSTRUCTION_NAME_PRINT           : return "print           ";
+    case INSTRUCTION_NAME_PRINT_ADDR      : return "print_addr      ";
+    case INSTRUCTION_NAME_PRINT_CHAR      : return "print_char      ";
     case INSTRUCTION_NAME_PRINT_NUM       : return "print_num       ";
     case INSTRUCTION_NAME_PRINT_PADDR     : return "print_paddr     ";
     case INSTRUCTION_NAME_PULL            : return "pull            ";
+    case INSTRUCTION_NAME_PUSH            : return "push            ";
     case INSTRUCTION_NAME_PUT_PROP        : return "put_prop        ";
     case INSTRUCTION_NAME_RET             : return "ret             ";
     case INSTRUCTION_NAME_RET_POPPED      : return "ret_popped      ";
@@ -102,6 +106,7 @@ get_inst_name (
     case INSTRUCTION_NAME_STOREB          : return "storeb          ";
     case INSTRUCTION_NAME_STOREW          : return "storew          ";
     case INSTRUCTION_NAME_SUB             : return "sub             ";
+    case INSTRUCTION_NAME_TEST_ATTR       : return "test_attr       ";
     case INSTRUCTION_NAME_UNK             :
     default                               : return "unknown         ";
     }

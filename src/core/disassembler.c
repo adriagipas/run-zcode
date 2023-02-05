@@ -589,6 +589,11 @@ decode_next_inst (
       if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_AND, err ) )
         return false;
       break;
+    case 0x0a: // test_attr
+      if ( !ins_2op_branch ( ins, mem, &addr,
+                             INSTRUCTION_NAME_TEST_ATTR, err ) )
+        return false;
+      break;
       
     case 0x0d: // store
       if ( !ins_2op ( ins, mem, &addr, INSTRUCTION_NAME_STORE, err ) )
@@ -659,6 +664,11 @@ decode_next_inst (
       break;
     case 0x29: // and
       if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_AND, err ) )
+        return false;
+      break;
+    case 0x2a: // test_attr
+      if ( !ins_2op_branch ( ins, mem, &addr,
+                             INSTRUCTION_NAME_TEST_ATTR, err ) )
         return false;
       break;
       
@@ -733,6 +743,11 @@ decode_next_inst (
       if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_AND, err ) )
         return false;
       break;
+    case 0x4a: // test_attr
+      if ( !ins_2op_branch ( ins, mem, &addr,
+                             INSTRUCTION_NAME_TEST_ATTR, err ) )
+        return false;
+      break;
       
     case 0x4d: // store
       if ( !ins_2op ( ins, mem, &addr, INSTRUCTION_NAME_STORE, err ) )
@@ -805,6 +820,11 @@ decode_next_inst (
       if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_AND, err ) )
         return false;
       break;
+    case 0x6a: // test_attr
+      if ( !ins_2op_branch ( ins, mem, &addr,
+                             INSTRUCTION_NAME_TEST_ATTR, err ) )
+        return false;
+      break;
       
     case 0x6d: // store
       if ( !ins_2op ( ins, mem, &addr, INSTRUCTION_NAME_STORE, err ) )
@@ -856,12 +876,21 @@ decode_next_inst (
         return false;
       break;
 
+    case 0x84: // get_prop_len
+      if ( !ins_1op_store ( ins, mem, &addr,
+                            INSTRUCTION_NAME_GET_PROP_LEN, err ) )
+        return false;
+      break;
     case 0x85: // inc
       if ( !ins_1op ( ins, mem, &addr, INSTRUCTION_NAME_INC, err ) )
         return false;
       if ( !op_to_ref ( ins, 0, err ) ) return false;
       break;
 
+    case 0x87: // print_addr
+      if ( !ins_1op ( ins, mem, &addr, INSTRUCTION_NAME_PRINT_ADDR, err ) )
+        return false;
+      break;
     case 0x88: // call_1s
       if ( mem->sf_mem[0] >= 4 )
         {
@@ -899,12 +928,21 @@ decode_next_inst (
         return false;
       break;
 
+    case 0x94: // get_prop_len
+      if ( !ins_1op_store ( ins, mem, &addr,
+                            INSTRUCTION_NAME_GET_PROP_LEN, err ) )
+        return false;
+      break;
     case 0x95: // inc
       if ( !ins_1op ( ins, mem, &addr, INSTRUCTION_NAME_INC, err ) )
         return false;
       if ( !op_to_ref ( ins, 0, err ) ) return false;
       break;
-      
+
+    case 0x97: // print_addr
+      if ( !ins_1op ( ins, mem, &addr, INSTRUCTION_NAME_PRINT_ADDR, err ) )
+        return false;
+      break;
     case 0x98: // call_1s
       if ( mem->sf_mem[0] >= 4 )
         {
@@ -942,12 +980,21 @@ decode_next_inst (
         return false;
       break;
 
+    case 0xa4: // get_prop_len
+      if ( !ins_1op_store ( ins, mem, &addr,
+                            INSTRUCTION_NAME_GET_PROP_LEN, err ) )
+        return false;
+      break;
     case 0xa5: // inc
       if ( !ins_1op ( ins, mem, &addr, INSTRUCTION_NAME_INC, err ) )
         return false;
       if ( !op_to_ref ( ins, 0, err ) ) return false;
       break;
-      
+
+    case 0xa7: // print_addr
+      if ( !ins_1op ( ins, mem, &addr, INSTRUCTION_NAME_PRINT_ADDR, err ) )
+        return false;
+      break;
     case 0xa8: // call_1s
       if ( mem->sf_mem[0] >= 4 )
         {
@@ -1003,6 +1050,12 @@ decode_next_inst (
       ins->name= INSTRUCTION_NAME_JE;
       if ( !read_branch ( ins, mem, &addr, err ) ) return false;
       break;
+
+    case 0xc3: // jg
+      if ( !read_var_ops ( ins, mem, &addr, err ) ) return false;
+      ins->name= INSTRUCTION_NAME_JG;
+      if ( !read_branch ( ins, mem, &addr, err ) ) return false;
+      break;
       
     case 0xc9: // and
       if ( !read_var_ops_store ( ins, mem, &addr, err ) ) return false;
@@ -1056,11 +1109,19 @@ decode_next_inst (
       ins->name= INSTRUCTION_NAME_PUT_PROP;
       break;
 
+    case 0xe5: // print_char
+      if ( !read_var_ops ( ins, mem, &addr, err ) ) return false;
+      ins->name= INSTRUCTION_NAME_PRINT_CHAR;
+      break;
     case 0xe6: // print_num
       if ( !read_var_ops ( ins, mem, &addr, err ) ) return false;
       ins->name= INSTRUCTION_NAME_PRINT_NUM;
       break;
-      
+
+    case 0xe8: // push
+      if ( !read_var_ops ( ins, mem, &addr, err ) ) return false;
+      ins->name= INSTRUCTION_NAME_PUSH;
+      break;
     case 0xe9: // pull
       if ( mem->sf_mem[0] == 6 )
         {
