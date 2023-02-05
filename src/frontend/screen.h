@@ -46,7 +46,7 @@ typedef struct
   int       style;
   uint16_t  fg_color;
   uint16_t  bg_color;
-
+  
   // Posició
   int       line;
   int       x; // En píxels.
@@ -91,10 +91,12 @@ typedef struct
   // Finestres i altres.
   int          _upwin_lines;
   int          _current_win;
-  int          _current_font;  // Efectiva, no la seleccionada
+  int          _current_font;  // Efectiva, no la seleccionada. Sols afecta LOW.
   int          _current_style; // Efectiva, no la seleccionada
+  uint8_t      _current_style_val;
+  uint8_t      _current_font_val; // 1-Normal, 2-picture, 3-graph, 4-courier
   ScreenCursor _cursors[2];
-
+  
   // Tokenitzer text
   struct
   {
@@ -130,6 +132,12 @@ screen_print (
               const char  *text,
               char       **err
               );
+
+void
+screen_set_style (
+                  Screen         *screen,
+                  const uint16_t  style
+                  );
 
 #define screen_GET_LINES(SCREEN) ((SCREEN)->_lines)
 #define screen_GET_WIDTH_CHARS(SCREEN) ((SCREEN)->_width_chars)

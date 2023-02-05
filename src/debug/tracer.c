@@ -88,11 +88,16 @@ get_inst_name (
     case INSTRUCTION_NAME_MUL             : return "mul             ";
     case INSTRUCTION_NAME_NEW_LINE        : return "new_line        ";
     case INSTRUCTION_NAME_OR              : return "or              ";
+    case INSTRUCTION_NAME_PRINT           : return "print           ";
+    case INSTRUCTION_NAME_PRINT_NUM       : return "print_num       ";
+    case INSTRUCTION_NAME_PRINT_PADDR     : return "print_paddr     ";
     case INSTRUCTION_NAME_PULL            : return "pull            ";
     case INSTRUCTION_NAME_PUT_PROP        : return "put_prop        ";
     case INSTRUCTION_NAME_RET             : return "ret             ";
     case INSTRUCTION_NAME_RET_POPPED      : return "ret_popped      ";
+    case INSTRUCTION_NAME_RFALSE          : return "rfalse          ";
     case INSTRUCTION_NAME_RTRUE           : return "rtrue           ";
+    case INSTRUCTION_NAME_SET_TEXT_STYLE  : return "set_text_style  ";
     case INSTRUCTION_NAME_STORE           : return "store           ";
     case INSTRUCTION_NAME_STOREB          : return "storeb          ";
     case INSTRUCTION_NAME_STOREW          : return "storew          ";

@@ -41,10 +41,12 @@ typedef struct
   gchar *font_normal_roman;
   gchar *font_normal_bold;
   gchar *font_normal_italic;
+  gchar *font_normal_bold_italic;
   gchar *font_fpitch_roman;
   gchar *font_fpitch_bold;
   gchar *font_fpitch_italic;
-
+  gchar *font_fpitch_bold_italic;
+  
   // CAMPS PRIVATS
   gboolean  _verbose;
   gchar    *_file_name;

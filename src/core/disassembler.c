@@ -878,6 +878,10 @@ decode_next_inst (
       if ( !ins_1op ( ins, mem, &addr, INSTRUCTION_NAME_JUMP, err ) )
         return false;
       break;
+    case 0x8d: // print_paddr
+      if ( !ins_1op ( ins, mem, &addr, INSTRUCTION_NAME_PRINT_PADDR, err ) )
+        return false;
+      break;
 
     case 0x8f: // call_1n
       if ( mem->sf_mem[0] >= 5 )
@@ -915,6 +919,10 @@ decode_next_inst (
       break;
     case 0x9c: // jump
       if ( !ins_1op ( ins, mem, &addr, INSTRUCTION_NAME_JUMP, err ) )
+        return false;
+      break;
+    case 0x9d: // print_paddr
+      if ( !ins_1op ( ins, mem, &addr, INSTRUCTION_NAME_PRINT_PADDR, err ) )
         return false;
       break;
 
@@ -956,7 +964,11 @@ decode_next_inst (
       if ( !ins_1op ( ins, mem, &addr, INSTRUCTION_NAME_JUMP, err ) )
         return false;
       break;
-
+    case 0xad: // print_paddr
+      if ( !ins_1op ( ins, mem, &addr, INSTRUCTION_NAME_PRINT_PADDR, err ) )
+        return false;
+      break;
+      
     case 0xaf: // call_1n
       if ( mem->sf_mem[0] >= 5 )
         {
@@ -968,8 +980,14 @@ decode_next_inst (
           // TODO !!
         }
       break;
-    case 0xb0: // ret_popped;
+    case 0xb0: // rtrue
       ins->name= INSTRUCTION_NAME_RTRUE;
+      break;
+    case 0xb1: // rfalse
+      ins->name= INSTRUCTION_NAME_RFALSE;
+      break;
+    case 0xb2: // print
+      ins->name= INSTRUCTION_NAME_PRINT;
       break;
       
     case 0xb8: // ret_popped;
@@ -1013,6 +1031,13 @@ decode_next_inst (
           if ( !ins_call ( ins, mem, err ) ) return false;
         }
       break;
+    case 0xda: // call_2n NOTA!! No cal comprovar que han de ser 2
+      if ( mem->sf_mem[0] >= 4 )
+        {
+          if ( !read_var_ops ( ins, mem, &addr, err ) ) return false;
+          if ( !ins_call ( ins, mem, err ) ) return false;
+        }
+      break;
       
     case 0xe0: // call_vs
       if ( !read_var_ops_store ( ins, mem, &addr, err ) ) return false;
@@ -1031,7 +1056,12 @@ decode_next_inst (
       ins->name= INSTRUCTION_NAME_PUT_PROP;
       break;
 
-    case 0xe9: //
+    case 0xe6: // print_num
+      if ( !read_var_ops ( ins, mem, &addr, err ) ) return false;
+      ins->name= INSTRUCTION_NAME_PRINT_NUM;
+      break;
+      
+    case 0xe9: // pull
       if ( mem->sf_mem[0] == 6 )
         {
         }
@@ -1040,6 +1070,15 @@ decode_next_inst (
           if ( !read_var_ops ( ins, mem, &addr, err ) ) return false;
           if ( !op_to_ref ( ins, 0, err ) ) return false;
           ins->name= INSTRUCTION_NAME_PULL;
+        }
+      break;
+      
+    case 0xf1: // set_text_style
+      if ( mem->sf_mem[0] >= 4 )
+        {
+          if ( !read_var_ops ( ins, mem, &addr, err ) ) return false;
+          if ( !ins_var_1op ( ins, INSTRUCTION_NAME_SET_TEXT_STYLE, err ) )
+            return false;
         }
       break;
       

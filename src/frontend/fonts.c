@@ -146,6 +146,12 @@ get_font_files (
                              err ) )
     goto error;
   if ( !set_font_file_name ( fconf, f->_conf->_verbose,
+                             "Normal Bold Italic",
+                             f->_conf->font_normal_bold_italic,
+                             &(f->_font_normal_bold_italic_fn),
+                             err ) )
+    goto error;
+  if ( !set_font_file_name ( fconf, f->_conf->_verbose,
                              "Fixed-pitch Roman",
                              f->_conf->font_fpitch_roman,
                              &(f->_font_fpitch_roman_fn),
@@ -161,6 +167,12 @@ get_font_files (
                              "Fixed-pitch Italic",
                              f->_conf->font_fpitch_italic,
                              &(f->_font_fpitch_italic_fn),
+                             err ) )
+    goto error;
+  if ( !set_font_file_name ( fconf, f->_conf->_verbose,
+                             "Fixed-pitch Bold Italic",
+                             f->_conf->font_fpitch_bold_italic,
+                             &(f->_font_fpitch_bold_italic_fn),
                              err ) )
     goto error;
   
@@ -247,6 +259,11 @@ open_fonts (
                     &(f->_fonts[F_NORMAL][F_ITALIC]),
                     false, err ) )
     return false;
+  if ( !open_font ( f->_conf->font_size, hdpi, vdpi, 
+                    f->_font_normal_bold_italic_fn,
+                    &(f->_fonts[F_NORMAL][F_BOLD_ITALIC]),
+                    false, err ) )
+    return false;
 
   // Fonts fixed-pitch
   if ( !open_font ( f->_conf->font_size, hdpi, vdpi, 
@@ -262,6 +279,11 @@ open_fonts (
   if ( !open_font ( f->_conf->font_size, hdpi, vdpi, 
                     f->_font_fpitch_italic_fn,
                     &(f->_fonts[F_FPITCH][F_ITALIC]),
+                    true, err ) )
+    return false;
+  if ( !open_font ( f->_conf->font_size, hdpi, vdpi, 
+                    f->_font_fpitch_bold_italic_fn,
+                    &(f->_fonts[F_FPITCH][F_BOLD_ITALIC]),
                     true, err ) )
     return false;
   
@@ -292,9 +314,11 @@ fonts_free (
   g_free ( f->_font_normal_roman_fn );
   g_free ( f->_font_normal_bold_fn );
   g_free ( f->_font_normal_italic_fn );
+  g_free ( f->_font_normal_bold_italic_fn );
   g_free ( f->_font_fpitch_roman_fn );
   g_free ( f->_font_fpitch_bold_fn );
   g_free ( f->_font_fpitch_italic_fn );
+  g_free ( f->_font_fpitch_bold_italic_fn );
   g_free ( f );
   TTF_Quit ();
   
@@ -320,9 +344,11 @@ fonts_new (
   ret->_font_normal_roman_fn= NULL;
   ret->_font_normal_bold_fn= NULL;
   ret->_font_normal_italic_fn= NULL;
+  ret->_font_normal_bold_italic_fn= NULL;
   ret->_font_fpitch_roman_fn= NULL;
   ret->_font_fpitch_bold_fn= NULL;
   ret->_font_fpitch_italic_fn= NULL;
+  ret->_font_fpitch_bold_italic_fn= NULL;
   for ( i= 0; i < F_NUM_FONTS; ++i )
     for ( j= 0; j < F_NUM_STYLES; ++j )
       ret->_fonts[i][j]= NULL;

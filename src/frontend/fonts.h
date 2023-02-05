@@ -41,6 +41,7 @@ enum {
   F_ROMAN= 0,
   F_BOLD,
   F_ITALIC,
+  F_BOLD_ITALIC,
   F_NUM_STYLES
 };
 
@@ -55,9 +56,11 @@ typedef struct
   char *_font_normal_roman_fn;
   char *_font_normal_bold_fn;
   char *_font_normal_italic_fn;
+  char *_font_normal_bold_italic_fn;
   char *_font_fpitch_roman_fn;
   char *_font_fpitch_bold_fn;
   char *_font_fpitch_italic_fn;
+  char *_font_fpitch_bold_italic_fn;
 
   // Fonts.
   TTF_Font *_fonts[F_NUM_FONTS][F_NUM_STYLES];

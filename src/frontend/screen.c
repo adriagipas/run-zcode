@@ -353,7 +353,7 @@ print_line (
   ScreenCursor *c;
   const char *p,*remain;
   size_t new_N,new_Nc;
-  int extent,count,draw_w;
+  int extent,count,draw_w,new_width;
   SDL_Surface *surface;
   SDL_Color color;
   uint32_t bg_color;
@@ -376,6 +376,7 @@ print_line (
       if ( *remain == '\0' )
         {
           c->x= 0;
+          c->width= 0;
           *(c->text)= '\0';
           c->N= 0;
           c->Nc= 0;
@@ -428,6 +429,7 @@ print_line (
           bg_color= true_color_to_u32 ( s, c->bg_color );
           draw_w= remain!=NULL ? (s->_width-c->x) : surface->w;
           if ( draw_w > s->_width ) draw_w= s->_width;
+          new_width= draw_w;
           rect.x= 0; rect.w= draw_w;
           rect.y= 0; rect.h= s->_line_height;
           if ( SDL_FillRect ( s->_render_buf, &rect, (Uint32) bg_color ) != 0 )
@@ -440,16 +442,19 @@ print_line (
           // --> Allibera memòria
           SDL_FreeSurface ( surface );
         }
+      else new_width= draw_w;
       
       // Actualitza c
       c->N= new_N;
       c->Nc= new_Nc;
+      c->width= new_width;
       c->space= (new_N>1 && c->text[new_N-1]==' ');
       
       // Si hi ha remain canvia de línia e imprimeix.
       if ( remain != NULL )
         {
           c->x= 0;
+          c->width= 0;
           *(c->text)= '\0';
           c->N= 0;
           c->Nc= 0;
@@ -577,8 +582,10 @@ screen_new (
   // Altres.
   ret->_upwin_lines= 0;
   ret->_current_win= W_LOW;
-  ret->_current_font= ret->_version<=3 ? F_FPITCH : F_NORMAL;
+  ret->_current_font= ret->_version<=4 ? F_FPITCH : F_NORMAL;
   ret->_current_style= F_ROMAN;
+  ret->_current_style_val= 0x00;
+  ret->_current_font_val= 1;
   
   // Inicialitza els cursors
   for ( n= 0; n < 2; ++n )
@@ -671,3 +678,41 @@ screen_print (
   return true;
   
 } // end screen_print
+
+
+void
+screen_set_style (
+                  Screen         *screen,
+                  const uint16_t  style
+                  )
+{
+
+  // NOTA!! No he de preocupar-me de la font de la finestra UP.
+  screen->_current_style_val= style;
+  screen->_reverse_color= (style&0x1)!=0;
+  if ( (style&0x08) == 0 && screen->_version >= 5 )
+    {
+      switch ( screen->_current_font_val )
+        {
+        case 1: screen->_current_font= F_NORMAL; break;
+        case 2:
+          screen->_current_font= F_NORMAL;
+          ww ( "Picture font not implemented" );
+          break;
+        case 3:
+          screen->_current_font= F_NORMAL;
+          ww ( "Character graphics font not implemented" );
+          break;
+        case 4: screen->_current_font= F_FPITCH; break;
+        }
+    }
+  else screen->_current_font= F_FPITCH;
+  switch ( (style>>1)&0x3 )
+    {
+    case 0: screen->_current_style= F_ROMAN; break;
+    case 1: screen->_current_style= F_BOLD; break;
+    case 2: screen->_current_style= F_ITALIC; break;
+    case 3: screen->_current_style= F_BOLD_ITALIC; break;
+    }
+  
+} // end screen_set_style

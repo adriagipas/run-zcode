@@ -50,10 +50,12 @@
 #define DEFAULT_FONT_SIZE          8
 #define DEFAULT_FONT_NORMAL_ROMAN  "sans"
 #define DEFAULT_FONT_NORMAL_BOLD   "sans:style=bold"
-#define DEFAULT_FONT_NORMAL_ITALIC "sans:style=oblique"
+#define DEFAULT_FONT_NORMAL_ITALIC "sans:style=italic"
+#define DEFAULT_FONT_NORMAL_BOLD_ITALIC "sans:bold:italic"
 #define DEFAULT_FONT_FPITCH_ROMAN  "mono"
 #define DEFAULT_FONT_FPITCH_BOLD   "mono:style=bold"
-#define DEFAULT_FONT_FPITCH_ITALIC "mono:style=oblique"
+#define DEFAULT_FONT_FPITCH_ITALIC "mono:style=italic"
+#define DEFAULT_FONT_FPITCH_BOLD_ITALIC "mono:bold:italic"
 
 #define DEFAULT_SCREEN_LINES      25
 #define DEFAULT_SCREEN_WIDTH      80
@@ -134,9 +136,11 @@ set_default_values (
   conf->font_normal_roman= g_strdup ( DEFAULT_FONT_NORMAL_ROMAN );
   conf->font_normal_bold= g_strdup ( DEFAULT_FONT_NORMAL_BOLD );
   conf->font_normal_italic= g_strdup ( DEFAULT_FONT_NORMAL_ITALIC );
+  conf->font_normal_bold_italic= g_strdup ( DEFAULT_FONT_NORMAL_BOLD_ITALIC );
   conf->font_fpitch_roman= g_strdup ( DEFAULT_FONT_FPITCH_ROMAN );
   conf->font_fpitch_bold= g_strdup ( DEFAULT_FONT_FPITCH_BOLD );
   conf->font_fpitch_italic= g_strdup ( DEFAULT_FONT_FPITCH_ITALIC );
+  conf->font_fpitch_bold_italic= g_strdup ( DEFAULT_FONT_FPITCH_BOLD_ITALIC );
   
 } // end set_default_values
 
@@ -220,12 +224,16 @@ read_conf (
                 &(conf->font_normal_bold) );
   read_string ( f, GROUP_FONTS, "normal-italic",
                 &(conf->font_normal_italic) );
+  read_string ( f, GROUP_FONTS, "normal-bold-italic",
+                &(conf->font_normal_bold_italic) );
   read_string ( f, GROUP_FONTS, "fpitch-roman",
                 &(conf->font_fpitch_roman) );
   read_string ( f, GROUP_FONTS, "fpitch-bold",
                 &(conf->font_fpitch_bold) );
   read_string ( f, GROUP_FONTS, "fpitch-italic",
                 &(conf->font_fpitch_italic) );
+  read_string ( f, GROUP_FONTS, "fpitch-bold-italic",
+                &(conf->font_fpitch_bold_italic) );
   
   // Allibera.
   g_key_file_free ( f );
@@ -256,9 +264,11 @@ conf_free (
   g_free ( conf->font_normal_roman );
   g_free ( conf->font_normal_bold );
   g_free ( conf->font_normal_italic );
+  g_free ( conf->font_normal_bold_italic );
   g_free ( conf->font_fpitch_roman );
   g_free ( conf->font_fpitch_bold );
   g_free ( conf->font_fpitch_italic );
+  g_free ( conf->font_fpitch_bold_italic );
   g_free ( conf->_file_name );
   g_free ( conf );
   
@@ -283,9 +293,11 @@ conf_new (
   ret->font_normal_roman= NULL;
   ret->font_normal_bold= NULL;
   ret->font_normal_italic= NULL;
+  ret->font_normal_bold_italic= NULL;
   ret->font_fpitch_roman= NULL;
   ret->font_fpitch_bold= NULL;
   ret->font_fpitch_italic= NULL;
+  ret->font_fpitch_bold_italic= NULL;
   
   // Obté el nom
   if ( file_name != NULL )
@@ -342,12 +354,16 @@ conf_write (
                           conf->font_normal_bold );
   g_key_file_set_string ( f, GROUP_FONTS, "normal-italic",
                           conf->font_normal_italic );
+  g_key_file_set_string ( f, GROUP_FONTS, "normal-bold-italic",
+                          conf->font_normal_bold_italic );
   g_key_file_set_string ( f, GROUP_FONTS, "fpitch-roman",
                           conf->font_fpitch_roman );
   g_key_file_set_string ( f, GROUP_FONTS, "fpitch-bold",
                           conf->font_fpitch_bold );
   g_key_file_set_string ( f, GROUP_FONTS, "fpitch-italic",
                           conf->font_fpitch_italic );
+  g_key_file_set_string ( f, GROUP_FONTS, "fpitch-bold-italic",
+                          conf->font_fpitch_bold_italic );
   
   // Escriu
   gerr= NULL;

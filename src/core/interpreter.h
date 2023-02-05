@@ -55,6 +55,13 @@ typedef struct
   uint32_t routine_offset;
   uint32_t static_strings_offset;
   uint32_t object_table_offset;
+  uint32_t alphabet_table_addr;
+  struct
+  {
+    size_t  size;
+    size_t  N;
+    char   *v;
+  }        text;
   
 } Interpreter;
 
