@@ -1441,6 +1441,46 @@ print_char (
 } // end print_char
 
 
+static bool
+print_input_text (
+                  Interpreter  *intp,
+                  char        **err
+                  )
+{
+
+  size_t n;
+  uint8_t zc;
+  
+
+  // Codifica input text
+  intp->text.N= 0;
+  for ( n= 0; n < intp->input_text.N; ++n )
+    {
+      zc= intp->input_text.v[n];
+      if ( zc == 0 ) // No deuria
+        { if ( !text_add ( intp, '\0', err ) ) return false; }
+      else if ( zc == 9 )
+        { if ( !text_add ( intp, '\t', err ) ) return false; }
+      else if ( zc == 11 )
+        { if ( !text_add ( intp, ' ', err ) ) return false; }
+      else if ( zc == 13 ) // No deuria
+        { if ( !text_add ( intp, '\n', err ) ) return false; }
+      else if ( zc >= 32 && zc <= 126 )
+        { if ( !text_add ( intp, (char) zc, err ) ) return false; }
+      else if ( zc >= 155 && zc <= 251 )
+        { ee ("print_input_text - CAL IMPLEMENTAR EXTRA CHARS"); }
+    }
+  if ( !text_add ( intp, '\0', err ) ) return false;
+  
+  // Imprimeix
+  if ( !screen_print ( intp->screen, intp->text.v, err ) )
+    return false;
+  
+  return true;
+  
+} // end print_input_text
+
+
 // read en verions >=5
 static bool
 sread (
@@ -1456,7 +1496,7 @@ sread (
   uint8_t max_letters,current_letters;
   int n,nread,real_max;
   uint8_t buf[SCREEN_INPUT_TEXT_BUF],zc;
-  bool stop;
+  bool stop,changed;
   
   
   // Parseja opcions.
@@ -1496,6 +1536,7 @@ sread (
     }
 
   // Llig.
+  screen_set_undo_mark ( intp->screen );
   real_max= (int) (max_letters-current_letters);
   if ( real_max > intp->input_text.size )
     {
@@ -1507,9 +1548,11 @@ sread (
   do {
     
     // Mentre tinga exit llegint.
+    changed= false;
     do {
       if ( !screen_read_char ( intp->screen, buf, &nread, err ) )
         return false;
+      if ( nread > 0 ) changed= true;
       for ( n= 0; n < nread && !stop; n++ )
         {
           zc= buf[n];
@@ -1529,7 +1572,15 @@ sread (
             }
         }
     } while ( nread > 0 && !stop );
+
+    // Repinta
+    if ( changed )
+      {
+        screen_undo ( intp->screen );
+        if ( !print_input_text ( intp, err ) ) return false;
+      }
     
+    // Esperta
     g_usleep ( TIME_SLEEP );
     
   } while ( !stop );
@@ -2542,7 +2593,8 @@ interpreter_new_from_file_name (
   ret->tracer= tracer;
   ret->screen= NULL;
   ret->text.v= NULL;
-
+  ret->input_text.v= NULL;
+  
   // Obri story file
   ret->sf= story_file_new_from_file_name ( file_name, err );
   if ( ret->sf == NULL ) goto error;

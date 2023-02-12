@@ -105,9 +105,19 @@ redraw_fb (
            )
 {
 
-  s->_redraw= false;
+  bool ret;
+  Uint32 t;
   
-  return window_update ( s->_win, s->_fb, err );
+  
+  t= SDL_GetTicks ();
+  if ( t < s->_last_redraw_t || (t-s->_last_redraw_t) >= REPAINT_TICKS )
+    {
+      ret= window_update ( s->_win, s->_fb, err );
+      s->_last_redraw_t= t;
+    }
+  else ret= true;
+  
+  return ret;
   
 } // end redraw_fb
 
@@ -567,6 +577,8 @@ screen_free (
 
 
   SDL_StopTextInput ();
+  if ( s->_undo.cursor.text != NULL ) g_free ( s->_undo.cursor.text );
+  if ( s->_undo.fb != NULL ) g_free ( s->_undo.fb );
   if ( s->_render_buf != NULL ) SDL_FreeSurface ( s->_render_buf );
   g_free ( s->_split.buf );
   for ( i= 0; i < 2; ++i )
@@ -608,6 +620,8 @@ screen_new (
     ret->_cursors[n].text= NULL;
   ret->_split.buf= NULL;
   ret->_render_buf= NULL;
+  ret->_undo.fb= NULL;
+  ret->_undo.cursor.text= NULL;
   
   // Inicialitza fonts i calcula dimensions pantalla.
   ret->_fonts= fonts_new ( conf, verbose, err );
@@ -653,6 +667,7 @@ screen_new (
   color= true_color_to_u32 ( ret, ret->_bg_color );
   for ( n= 0; n < ret->_width*ret->_height; ++n )
     ret->_fb[n]= color;
+  ret->_last_redraw_t= (Uint32) -1;
   if ( !redraw_fb ( ret, err ) ) goto error;
   
   // Altres.
@@ -695,9 +710,12 @@ screen_new (
                                          ret->_line_height, err );
   if ( ret->_render_buf == NULL ) goto error;
 
+  // Undo.
+  ret->_undo.cursor.text= g_new ( char, 1 );
+  ret->_undo.cursor.size= 1;
+  ret->_undo.fb= g_new ( uint32_t, ret->_width*ret->_height );
+  
   // Altres
-  ret->_last_print_t= (Uint32) -1;
-  ret->_redraw= false;
   SDL_StartTextInput ();
   
   return ret;
@@ -721,7 +739,6 @@ screen_print (
   uint16_t fg_color,bg_color;
   ScreenCursor *c;
   char *line_text;
-  Uint32 t;
   
   
   // Obté estil, color, etc.
@@ -755,13 +772,7 @@ screen_print (
       return false;
   
   // Actualitza
-  t= SDL_GetTicks ();
-  if ( t < s->_last_print_t || (t-s->_last_print_t) >= REPAINT_TICKS )
-    {
-      if ( !redraw_fb ( s, err ) ) return false;
-    }
-  else s->_redraw= true;
-  s->_last_print_t= t;
+  if ( !redraw_fb ( s, err ) ) return false;
   
   return true;
   
@@ -817,8 +828,9 @@ screen_read_char (
 
   SDL_Event e;
 
+  
   // Repinta si cal.
-  if ( screen->_redraw ) { if ( !redraw_fb ( screen, err ) ) return false; }
+  if ( !redraw_fb ( screen, err ) ) return false;
   
   // Intenta llegit caràcter i aprofita per a gestionar events interns
   // de la interfície.
@@ -842,3 +854,55 @@ screen_read_char (
   return true;
   
 } // end screen_read_char
+
+
+void
+screen_set_undo_mark (
+                      Screen *screen
+                      )
+{
+
+  ScreenCursor *c;
+
+  
+  c= &(screen->_cursors[screen->_current_win]);
+  if ( c->size > screen->_undo.cursor.size )
+    {
+      screen->_undo.cursor.text=
+        g_renew ( char, screen->_undo.cursor.text, c->size );
+      screen->_undo.cursor.size= c->size;
+    }
+  memcpy ( screen->_undo.fb, screen->_fb,
+           screen->_width*screen->_height*sizeof(uint32_t) );
+  strcpy ( screen->_undo.cursor.text, c->text );
+  screen->_undo.cursor.line= c->line;
+  screen->_undo.cursor.x= c->x;
+  screen->_undo.cursor.width= c->width;
+  screen->_undo.cursor.N= c->N;
+  screen->_undo.cursor.Nc= c->Nc;
+  screen->_undo.cursor.space= c->space;
+  
+} // end screen_set_undo_mark
+
+
+void
+screen_undo (
+             Screen *screen
+             )
+{
+
+  ScreenCursor *c;
+
+  
+  c= &(screen->_cursors[screen->_current_win]);
+  memcpy ( screen->_fb, screen->_undo.fb,
+           screen->_width*screen->_height*sizeof(uint32_t) );
+  strcpy ( c->text, screen->_undo.cursor.text );
+  c->line= screen->_undo.cursor.line;
+  c->x= screen->_undo.cursor.x;
+  c->width= screen->_undo.cursor.width;
+  c->N= screen->_undo.cursor.N;
+  c->Nc= screen->_undo.cursor.Nc;
+  c->space= screen->_undo.cursor.space;
+  
+} // end screen_undo

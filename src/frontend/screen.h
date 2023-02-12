@@ -99,6 +99,13 @@ typedef struct
   uint8_t      _current_style_val;
   uint8_t      _current_font_val; // 1-Normal, 2-picture, 3-graph, 4-courier
   ScreenCursor _cursors[2];
+
+  // Per a poder gestionar fàcilment el echo.
+  struct
+  {
+    ScreenCursor  cursor;
+    uint32_t     *fb;
+  } _undo;
   
   // Tokenitzer text
   struct
@@ -111,10 +118,8 @@ typedef struct
 
   // Altres
   SDL_Surface *_render_buf;
-  Uint32       _last_print_t; // ticks SDL (en millisegons) des de
-                              // l'últim repintat amb print.
-  bool         _redraw;       // Si no es pinta en el moment es desa
-                              // per a redibuixar
+  Uint32       _last_redraw_t; // ticks SDL (en millisegons) des de
+                               // l'últim repintat amb print.
   
 } Screen;
 
@@ -158,6 +163,18 @@ screen_read_char (
                   int      *N,
                   char    **err
                   );
+
+// Indica la posició a la que torna undo. ATENCIÓ!!! Perquè funcione
+// no es pot canviar ni el cursor, ni la font, ni l'estil, etc.
+void
+screen_set_undo_mark (
+                      Screen *screen
+                      );
+
+void
+screen_undo (
+             Screen *screen
+             );
 
 #define screen_GET_LINES(SCREEN) ((SCREEN)->_lines)
 #define screen_GET_WIDTH_CHARS(SCREEN) ((SCREEN)->_width_chars)
