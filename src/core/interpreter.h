@@ -63,6 +63,12 @@ typedef struct
     size_t  N;
     char   *v;
   }        text;
+  struct
+  {
+    size_t   size;
+    size_t   N;
+    uint8_t *v;  // ZSCII
+  }        input_text;
   
 } Interpreter;
 

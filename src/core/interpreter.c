@@ -56,6 +56,13 @@
 #define U16_S32(U16) ((int32_t) ((int16_t) (U16)))
 #define S32_U16(S32) ((uint16_t) ((uint32_t) (S32)))
 
+// ESPECIAL ZSCII CHARS
+#define ZSCII_NEWLINE 13
+#define ZSCII_DELETE  8
+
+// 10 milisegons, de moment
+#define TIME_SLEEP 10000
+
 
 
 
@@ -1434,6 +1441,126 @@ print_char (
 } // end print_char
 
 
+// read en verions >=5
+static bool
+sread (
+       Interpreter      *intp,
+       const operand_t  *ops,
+       const int         nops,
+       const uint8_t     result_var,
+       char            **err
+       )
+{
+
+  uint16_t text_buf,parse_buf;
+  uint8_t max_letters,current_letters;
+  int n,nread,real_max;
+  uint8_t buf[SCREEN_INPUT_TEXT_BUF],zc;
+  bool stop;
+  
+  
+  // Parseja opcions.
+  if ( nops < 2 || nops > 4 )
+    {
+      msgerror ( err, "(sread) Expected between 2 and 4 operands but %d found",
+                 nops );
+      return false;
+    }
+  if ( !op_to_u16 ( intp, &(ops[0]), &text_buf, err ) ) return false;
+  if ( !op_to_u16 ( intp, &(ops[1]), &parse_buf, err ) ) return false;
+  if ( nops > 2 )
+    {
+      ee ( "CAL IMPLEMENTAR sread time routine" );
+    }
+  
+  // Obté capacitat màxima caràcters.
+  if ( !memory_map_READB ( intp->mem, text_buf, &max_letters, true, err ) )
+    return false;
+  if ( max_letters < 3 )
+    {
+      msgerror ( err, "(sread) Text buffer length (%d) less than 3",
+                 max_letters);
+      return false;
+    }
+  
+  // Obté caràcters que hi han actualment en el buffer.
+  if ( !memory_map_READB ( intp->mem, text_buf+1,
+                           &current_letters, true, err ) )
+    return false;
+  if ( current_letters > max_letters )
+    {
+      msgerror ( err, "(sread) Text buffer already contains more text"
+                 " (%u) than allowed (%u)",
+                 current_letters, max_letters );
+      return false;
+    }
+
+  // Llig.
+  real_max= (int) (max_letters-current_letters);
+  if ( real_max > intp->input_text.size )
+    {
+      intp->input_text.v= g_renew ( uint8_t, intp->input_text.v, real_max );
+      intp->input_text.size= real_max;
+    }
+  intp->input_text.N= 0;
+  stop= false;
+  do {
+    
+    // Mentre tinga exit llegint.
+    do {
+      if ( !screen_read_char ( intp->screen, buf, &nread, err ) )
+        return false;
+      for ( n= 0; n < nread && !stop; n++ )
+        {
+          zc= buf[n];
+          if ( zc == ZSCII_NEWLINE ) { stop= true; }
+          else if ( zc == ZSCII_DELETE )
+            {
+              if ( intp->input_text.N > 0 ) --(intp->input_text.N);
+            }
+          // ASCII o EXTRA
+          else if ( (zc >= 32 && zc <= 126) || (zc >= 155 && zc <= 251) )
+            {
+              if ( intp->input_text.N < real_max )
+                {
+                  if ( zc >= 'A' && zc <= 'Z' ) zc= (zc-'A')+'a';
+                  intp->input_text.v[intp->input_text.N++]= zc;
+                }
+            }
+        }
+    } while ( nread > 0 && !stop );
+    
+    g_usleep ( TIME_SLEEP );
+    
+  } while ( !stop );
+
+  // Escriu en el text buffer
+  if ( !memory_map_WRITEB ( intp->mem, text_buf+1,
+                            current_letters+intp->input_text.N,
+                            true, err ) )
+    return false;
+  for ( n= 0; n < intp->input_text.N; ++n )
+    {
+      if ( !memory_map_WRITEB ( intp->mem,
+                                text_buf + 2 +
+                                ((uint16_t) current_letters) +
+                                ((uint16_t) n),
+                                intp->input_text.v[n],
+                                true, err ) )
+        return false;
+    }
+  
+  for ( int i= 0; i < intp->input_text.N; ++i )
+    printf("%d ",intp->input_text.v[i]);
+  printf("\n");
+  
+  ee ( "CAL IMPLEMENTAR sread" );
+  
+  return true;
+  
+} // end sread
+
+
 static int
 exec_next_inst (
                 Interpreter  *intp,
@@ -2279,9 +2406,18 @@ exec_next_inst (
       if ( !op_to_u16 ( intp, &(ops[2]), &op3, err ) ) return RET_ERROR;
       if ( !put_prop ( intp, op1, op2, op3, err ) ) return RET_ERROR;
       break;
-    case 0xe4: // sread
-      g_usleep ( 20000000 ); // <--- REMOVE
-      ee ( "CAL IMPLEMENTAR sread" );
+    case 0xe4: // read
+      if ( intp->version >= 5 )
+        {
+          if ( !read_var_ops_store ( intp, ops, &nops, -1, &result_var, err ) )
+            return RET_ERROR;
+          if ( !sread ( intp, ops, nops, result_var, err ) ) return RET_ERROR;
+        }
+      else
+        {
+          msgerror ( err, "read not implemented in version %d", intp->version );
+          return RET_ERROR;
+        }
       break;
     case 0xe5: // print_char
       if ( !read_var_ops ( intp, ops, &nops, 1, err ) ) return RET_ERROR;
@@ -2372,6 +2508,7 @@ interpreter_free (
                   )
 {
 
+  g_free ( intp->input_text.v );
   g_free ( intp->text.v );
   if ( intp->screen != NULL ) screen_free ( intp->screen );
   if ( intp->ins != NULL ) instruction_free ( intp->ins );
@@ -2467,6 +2604,8 @@ interpreter_new_from_file_name (
   ret->text.size= 8; // Té prou espai per a imprimir un número 16bit
                      // amb signe
   ret->text.v= g_new ( char, ret->text.size );
+  ret->input_text.size= 1;
+  ret->input_text.v= g_new ( uint8_t, ret->input_text.size );
   
   return ret;
 

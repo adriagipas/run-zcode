@@ -1108,7 +1108,16 @@ decode_next_inst (
       if ( !read_var_ops ( ins, mem, &addr, err ) ) return false;
       ins->name= INSTRUCTION_NAME_PUT_PROP;
       break;
-
+    case 0xe4: // read
+      if ( mem->sf_mem[0] >= 5 )
+        {
+          if ( !read_var_ops_store ( ins, mem, &addr, err ) ) return false;
+          ins->name= INSTRUCTION_NAME_READ;
+        }
+      else
+        {
+        }
+      break;
     case 0xe5: // print_char
       if ( !read_var_ops ( ins, mem, &addr, err ) ) return false;
       ins->name= INSTRUCTION_NAME_PRINT_CHAR;

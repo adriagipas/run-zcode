@@ -35,6 +35,9 @@
 #include "fonts.h"
 #include "window.h"
 
+// Concideix amb el màxim de SDL
+#define SCREEN_INPUT_TEXT_BUF 32
+
 // Desa estat per a renderitzat en cada cursor. En realitat desa
 // informació sobre l'últim tros de de text renderitzat per a poder
 // re-renderitzar si es continuen afegint caràcters a la paraula.
@@ -108,6 +111,10 @@ typedef struct
 
   // Altres
   SDL_Surface *_render_buf;
+  Uint32       _last_print_t; // ticks SDL (en millisegons) des de
+                              // l'últim repintat amb print.
+  bool         _redraw;       // Si no es pinta en el moment es desa
+                              // per a redibuixar
   
 } Screen;
 
@@ -137,6 +144,19 @@ void
 screen_set_style (
                   Screen         *screen,
                   const uint16_t  style
+                  );
+
+// Intenta llegir caràcters en format ZSCII. Típicament llig un
+// caràcter cada vegada, però pot llegir de colp fins a
+// SCREEN_INPUT_TEXT_BUF. En 'N' desa el nombre de caràcters llegits.
+// IMPORTANT!!! Encara que se li passa un buffer, aquesta funció
+// retorna després de cada event de caràcter llegit.
+bool
+screen_read_char (
+                  Screen   *screen,
+                  uint8_t   buf[SCREEN_INPUT_TEXT_BUF],
+                  int      *N,
+                  char    **err
                   );
 
 #define screen_GET_LINES(SCREEN) ((SCREEN)->_lines)

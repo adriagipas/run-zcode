@@ -55,6 +55,8 @@
 #define W_UP  1
 #define W_LOW 0
 
+#define REPAINT_TICKS 20 // 50 FPS
+
 
 
 
@@ -102,7 +104,11 @@ redraw_fb (
            char   **err
            )
 {
+
+  s->_redraw= false;
+  
   return window_update ( s->_win, s->_fb, err );
+  
 } // end redraw_fb
 
 
@@ -443,7 +449,7 @@ print_line (
           SDL_FreeSurface ( surface );
         }
       else new_width= draw_w;
-      
+
       // Actualitza c
       c->N= new_N;
       c->Nc= new_Nc;
@@ -476,6 +482,75 @@ print_line (
 } // end print_line
 
 
+static bool
+add_nontext_zscii (
+                   const SDL_Event *event,
+                   uint8_t          buf[SCREEN_INPUT_TEXT_BUF],
+                   int             *N
+                   )
+{
+
+  bool ret;
+
+  
+  if ( *N == SCREEN_INPUT_TEXT_BUF ) return false;
+  
+  // FALTA GESTIONAR KEYPAD!!!! EL PROBLEMA QUE TINC ÉS QUE NO SÉ
+  // DISTINGIR KEYPAD DE TEXTINPUT EVENT, ÉS A DIR, UN KEYPAD NUMERIC
+  // ES CODIFICA SEMPRE COM ASCII. PERÒ CREC QUE NO IMPORTA PERQUÈ AL
+  // FINAL NO CREC QUE NINGUN JOC EXIGISCA DISTINGIR AIXÒ.
+  ret= true;
+  switch ( event->key.keysym.sym )
+    {
+    case SDLK_BACKSPACE: buf[(*N)++]= 8; break;
+    case SDLK_RETURN:    buf[(*N)++]= 13; break;
+    case SDLK_ESCAPE:    buf[(*N)++]= 27; break;
+    case SDLK_UP:        buf[(*N)++]= 129; break;
+    case SDLK_DOWN:      buf[(*N)++]= 130; break;
+    case SDLK_LEFT:      buf[(*N)++]= 131; break;
+    case SDLK_RIGHT:     buf[(*N)++]= 132; break;
+    case SDLK_F1:        buf[(*N)++]= 133; break;
+    case SDLK_F2:        buf[(*N)++]= 134; break;
+    case SDLK_F3:        buf[(*N)++]= 135; break;
+    case SDLK_F4:        buf[(*N)++]= 136; break;
+    case SDLK_F5:        buf[(*N)++]= 137; break;
+    case SDLK_F6:        buf[(*N)++]= 138; break;
+    case SDLK_F7:        buf[(*N)++]= 139; break;
+    case SDLK_F8:        buf[(*N)++]= 140; break;
+    case SDLK_F9:        buf[(*N)++]= 141; break;
+    case SDLK_F10:       buf[(*N)++]= 142; break;
+    case SDLK_F11:       buf[(*N)++]= 143; break;
+    case SDLK_F12:       buf[(*N)++]= 144; break;
+    default: ret= false; break;
+      
+    }
+
+  return ret;
+  
+} // end add_nontext_zscii
+
+
+static void
+text_input2zscii (
+                  const char *text,
+                  uint8_t     buf[SCREEN_INPUT_TEXT_BUF],
+                  int        *N
+                  )
+{
+
+  const char *p;
+
+
+  for ( p= text; *p != '\0' && *N < SCREEN_INPUT_TEXT_BUF; ++p )
+    {
+      // Standard ascii
+      if ( *p >= 32 && *p <= 126 ) buf[(*N)++]= *p;
+    }
+  
+} // end text_input2zscii
+
+
+
 
 
 /**********************/
@@ -491,6 +566,7 @@ screen_free (
   int i;
 
 
+  SDL_StopTextInput ();
   if ( s->_render_buf != NULL ) SDL_FreeSurface ( s->_render_buf );
   g_free ( s->_split.buf );
   for ( i= 0; i < 2; ++i )
@@ -618,6 +694,11 @@ screen_new (
   ret->_render_buf= window_get_surface ( ret->_win, ret->_width,
                                          ret->_line_height, err );
   if ( ret->_render_buf == NULL ) goto error;
+
+  // Altres
+  ret->_last_print_t= (Uint32) -1;
+  ret->_redraw= false;
+  SDL_StartTextInput ();
   
   return ret;
   
@@ -640,6 +721,7 @@ screen_print (
   uint16_t fg_color,bg_color;
   ScreenCursor *c;
   char *line_text;
+  Uint32 t;
   
   
   // Obté estil, color, etc.
@@ -671,9 +753,15 @@ screen_print (
   while ( (line_text= split_next ( s )) != NULL )
     if ( !print_line ( s, line_text, err ) )
       return false;
-
+  
   // Actualitza
-  if ( !redraw_fb ( s, err ) ) return false;
+  t= SDL_GetTicks ();
+  if ( t < s->_last_print_t || (t-s->_last_print_t) >= REPAINT_TICKS )
+    {
+      if ( !redraw_fb ( s, err ) ) return false;
+    }
+  else s->_redraw= true;
+  s->_last_print_t= t;
   
   return true;
   
@@ -716,3 +804,41 @@ screen_set_style (
     }
   
 } // end screen_set_style
+
+
+bool
+screen_read_char (
+                  Screen   *screen,
+                  uint8_t   buf[SCREEN_INPUT_TEXT_BUF],
+                  int      *N,
+                  char    **err
+                  )
+{
+
+  SDL_Event e;
+
+  // Repinta si cal.
+  if ( screen->_redraw ) { if ( !redraw_fb ( screen, err ) ) return false; }
+  
+  // Intenta llegit caràcter i aprofita per a gestionar events interns
+  // de la interfície.
+  *N= 0;
+  while ( window_next_event ( screen->_win, &e ) )
+    switch ( e.type )
+      {
+      case SDL_KEYDOWN:
+        if ( add_nontext_zscii ( &e, buf, N ) )
+          return true;
+        break;
+      case SDL_TEXTINPUT:
+        if ( *e.text.text != '\0' )
+          {
+            text_input2zscii ( e.text.text, buf, N );
+            return true;
+          }
+        break;
+      }
+  
+  return true;
+  
+} // end screen_read_char
