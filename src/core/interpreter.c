@@ -1161,6 +1161,67 @@ text_add (
 
 
 static bool
+zscii_char2utf8 (
+                 Interpreter     *intp,
+                 const uint16_t   val,
+                 char           **err
+                 )
+{
+
+  int16_t zc;
+  
+
+  zc= (int16_t) val;
+  if ( zc < 0 ) goto wrong_zc;
+  else if ( zc < 32 ) // Alguns caràcters especials
+    {
+      if ( zc == 0 )
+        {
+          if ( !text_add ( intp, '\0', err ) ) return false;
+        }
+      else if ( zc == 9 )
+        {
+          if ( intp->version == 6 )
+            {
+              if ( !text_add ( intp, '\t', err ) ) return false;
+            }
+          else goto wrong_zc;
+        }
+      else if ( zc == 11 ) // Sentence space???
+        {
+          if ( intp->version == 6 )
+            {
+              if ( !text_add ( intp, ' ', err ) ) return false;
+            }
+          else goto wrong_zc;
+        }
+      else if ( zc == 13 )
+        {
+          if ( !text_add ( intp, '\n', err ) ) return false;
+        }
+      else goto wrong_zc;
+    }
+  else if ( zc < 127 ) // standard ASCII
+    {
+      if ( !text_add ( intp, (char) zc, err ) ) return false;
+    }
+  else if ( zc < 155 ) goto wrong_zc;
+  else if ( zc < 252 ) // extra characters
+    {
+      ee ( "CAL IMPLEMENTAR extra characters" );
+    }
+  else goto wrong_zc;
+  
+  return true;
+
+ wrong_zc:
+  msgerror ( err, "Failed to print character: invalid code %d", zc );
+  return false;
+  
+} // end zscii_char2utf8
+
+
+static bool
 zscii2utf8 (
             Interpreter     *intp,
             const uint32_t   addr,
@@ -1171,11 +1232,16 @@ zscii2utf8 (
             )
 {
 
-  uint16_t word,abbr_addr;
+  uint16_t word,abbr_addr,zscii;
   uint32_t caddr,tmp_addr;
   int alph,i,abbr_ind,prev_alph;
   uint8_t zc;
   bool end,lock_alph;
+  enum {
+    WAIT_ZC,
+    WAIT_ZSCII_TOP,
+    WAIT_ZSCII_LOW
+  } mode;
   
   
   prev_alph= alph= 0;
@@ -1183,6 +1249,7 @@ zscii2utf8 (
   abbr_ind= 0;
   lock_alph= false;
   caddr= addr;
+  mode= WAIT_ZC;
   do {
 
     // Llig següent paraula
@@ -1195,9 +1262,24 @@ zscii2utf8 (
     for ( i= 0; i < 3; ++i )
       {
         zc= (word>>10)&0x1f;
+
+        // ZSCII low
+        if ( mode == WAIT_ZSCII_LOW )
+          {
+            zscii|= (uint16_t) zc;
+            mode= WAIT_ZC;
+            if ( !zscii_char2utf8 ( intp, zscii, err ) ) return false;
+          }
+
+        // ZSCII top
+        else if ( mode == WAIT_ZSCII_TOP )
+          {
+            zscii= ((uint16_t) zc)<<5;
+            mode= WAIT_ZSCII_LOW;
+          }
         
         // Special characters
-        if ( zc < 6 )
+        else if ( zc < 6 )
           {
             switch ( zc )
               {
@@ -1272,7 +1354,8 @@ zscii2utf8 (
               ee ( "CAL IMPLEMENTAR ALPHABET_TABLE " );
             else
               {
-                if ( intp->version == 1 )
+                if ( zc == 6 && alph == 2 ) mode= WAIT_ZSCII_TOP;
+                else if ( intp->version == 1 )
                   {
                     if ( !text_add ( intp, ZSCII_ENC_V1[alph][zc-6], err ) )
                       return false;
@@ -1379,64 +1462,17 @@ print_char (
             )
 {
 
-  int16_t zc;
-  
-
   // Prepara
-  zc= (int16_t) val;
   intp->text.N= 0;
 
   // Descodifica caràcter
-  if ( zc < 0 ) goto wrong_zc;
-  else if ( zc < 32 ) // Alguns caràcters especials
-    {
-      if ( zc == 0 )
-        {
-          if ( !text_add ( intp, '\0', err ) ) return false;
-        }
-      else if ( zc == 9 )
-        {
-          if ( intp->version == 6 )
-            {
-              if ( !text_add ( intp, '\t', err ) ) return false;
-            }
-          else goto wrong_zc;
-        }
-      else if ( zc == 11 ) // Sentence space???
-        {
-          if ( intp->version == 6 )
-            {
-              if ( !text_add ( intp, ' ', err ) ) return false;
-            }
-          else goto wrong_zc;
-        }
-      else if ( zc == 13 )
-        {
-          if ( !text_add ( intp, '\n', err ) ) return false;
-        }
-      else goto wrong_zc;
-    }
-  else if ( zc < 127 ) // standard ASCII
-    {
-      if ( !text_add ( intp, (char) zc, err ) ) return false;
-    }
-  else if ( zc < 155 ) goto wrong_zc;
-  else if ( zc < 252 ) // extra characters
-    {
-      ee ( "CAL IMPLEMENTAR extra characters" );
-    }
-  else goto wrong_zc;
+  if ( !zscii_char2utf8 ( intp, val, err ) ) return false;
   if ( !text_add ( intp, '\0', err ) ) return false;
-
+  
   // Imprimeix
-  if ( !screen_print ( intp->screen, intp->text.v, err ) )
-    return false;
+  if ( !screen_print ( intp->screen, intp->text.v, err ) ) return false;
   
   return true;
-
- wrong_zc:
-  msgerror ( err, "Failed to print character: invalid code %d", zc );
-  return false;
   
 } // end print_char
 
