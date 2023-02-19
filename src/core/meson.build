@@ -1,4 +1,6 @@
 CORE= static_library('core',
+                     'dictionary.h',
+                     'dictionary.c',
                      'disassembler.h',
                      'disassembler.c',
                      'iff.h',

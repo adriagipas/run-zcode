@@ -946,6 +946,8 @@ state_free_frame (
                   )
 {
 
+  assert ( state->frame_ind > 0 );
+  
   if ( state->frame == 0x0000 )
     {
       msgerror ( err, "Stack underflow" );

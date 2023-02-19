@@ -30,6 +30,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "dictionary.h"
 #include "disassembler.h"
 #include "memory_map.h"
 #include "state.h"
@@ -49,6 +50,8 @@ typedef struct
   Instruction  *ins;
   Tracer       *tracer; // Pot ser NULL.
   Screen       *screen;
+  Dictionary   *std_dict;
+  Dictionary   *usr_dict;
   
   // Altres
   uint8_t version;

@@ -1066,7 +1066,11 @@ decode_next_inst (
       if ( !read_var_ops ( ins, mem, &addr, err ) ) return false;
       if ( !ins_var_2ops ( ins, INSTRUCTION_NAME_STORE, err ) ) return false;
       break;
-      
+
+    case 0xcf: // loadw
+      if ( !read_var_ops_store ( ins, mem, &addr, err ) ) return false;
+      if ( !ins_var_2ops ( ins, INSTRUCTION_NAME_LOADW, err ) ) return false;
+      break;
     case 0xd0: // loadb
       if ( !read_var_ops_store ( ins, mem, &addr, err ) ) return false;
       if ( !ins_var_2ops ( ins, INSTRUCTION_NAME_LOADB, err ) ) return false;

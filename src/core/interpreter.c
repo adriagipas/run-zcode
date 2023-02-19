@@ -1528,7 +1528,7 @@ sread (
        )
 {
 
-  uint16_t text_buf,parse_buf;
+  uint16_t text_buf,parse_buf,result;
   uint8_t max_letters,current_letters;
   int n,nread,real_max;
   uint8_t buf[SCREEN_INPUT_TEXT_BUF],zc;
@@ -1536,6 +1536,7 @@ sread (
   
   
   // Parseja opcions.
+  result= 13; // Newline
   if ( nops < 2 || nops > 4 )
     {
       msgerror ( err, "(sread) Expected between 2 and 4 operands but %d found",
@@ -1616,11 +1617,14 @@ sread (
         if ( !print_input_text ( intp, err ) ) return false;
       }
     
-    // Esperta
+    // Espera
     g_usleep ( TIME_SLEEP );
     
   } while ( !stop );
-
+  // --> Pinta retorn carro.
+  if ( !screen_print ( intp->screen, "\n", err ) )
+    return false;
+  
   // Escriu en el text buffer
   if ( !memory_map_WRITEB ( intp->mem, text_buf+1,
                             current_letters+intp->input_text.N,
@@ -1636,12 +1640,19 @@ sread (
                                 true, err ) )
         return false;
     }
-  
+  /* DEBUG!!!
   for ( int i= 0; i < intp->input_text.N; ++i )
     printf("%d ",intp->input_text.v[i]);
   printf("\n");
+  */
   
-  ee ( "CAL IMPLEMENTAR sread" );
+  // Parseja.
+  if ( !dictionary_parse ( intp->std_dict, text_buf, parse_buf, err ) )
+    return false;
+
+  // Desa valor retorn
+  if ( !write_var ( intp, result_var, result, err ) )
+    return false;
   
   return true;
   
@@ -1662,7 +1673,7 @@ exec_next_inst (
   operand_t ops[8];
   bool cond;
   
-  
+
   state= intp->state;
   if ( !memory_map_READB ( intp->mem, state->PC++, &opcode, true, err ) )
     return RET_ERROR;
@@ -2429,7 +2440,16 @@ exec_next_inst (
         { if ( !read_var ( intp, 0, &tmp16, err ) ) return RET_ERROR; }
       if ( !write_var ( intp, op1_u8, op2, err ) ) return RET_ERROR;
       break;
-      
+
+    case 0xcf: // loadw
+      if ( !read_var_ops_store ( intp, ops, &nops, 2, &result_var, err ) )
+        return RET_ERROR;
+      if ( !op_to_u16 ( intp, &(ops[0]), &op1, err ) ) return RET_ERROR;
+      if ( !op_to_u16 ( intp, &(ops[1]), &op2, err ) ) return RET_ERROR;
+      if ( !memory_map_READW ( intp->mem, op1 + 2*op2, &res, false, err ) )
+        return RET_ERROR;
+      if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
+      break;
     case 0xd0: // loadb
       if ( !read_var_ops_store ( intp, ops, &nops, 2, &result_var, err ) )
         return RET_ERROR;
@@ -2595,6 +2615,8 @@ interpreter_free (
                   )
 {
 
+  if ( intp->std_dict != NULL ) dictionary_free ( intp->std_dict );
+  if ( intp->usr_dict != NULL ) dictionary_free ( intp->usr_dict );
   g_free ( intp->input_text.v );
   g_free ( intp->text.v );
   if ( intp->screen != NULL ) screen_free ( intp->screen );
@@ -2618,8 +2640,9 @@ interpreter_new_from_file_name (
 {
 
   Interpreter *ret;
-
-
+  uint32_t std_dict_addr;
+  
+  
   // Prepara.
   ret= g_new ( Interpreter, 1 );
   ret->sf= NULL;
@@ -2630,6 +2653,8 @@ interpreter_new_from_file_name (
   ret->screen= NULL;
   ret->text.v= NULL;
   ret->input_text.v= NULL;
+  ret->std_dict= NULL;
+  ret->usr_dict= NULL;
   
   // Obri story file
   ret->sf= story_file_new_from_file_name ( file_name, err );
@@ -2654,7 +2679,7 @@ interpreter_new_from_file_name (
   
   // Inicialitza mapa de memòria.
   ret->mem= memory_map_new ( ret->sf, ret->state, tracer, err );
-  if ( ret == NULL ) goto error;
+  if ( ret->mem == NULL ) goto error;
 
   // Altres
   ret->version= ret->mem->sf_mem[0];
@@ -2694,6 +2719,17 @@ interpreter_new_from_file_name (
   ret->text.v= g_new ( char, ret->text.size );
   ret->input_text.size= 1;
   ret->input_text.v= g_new ( uint8_t, ret->input_text.size );
+
+  // Diccionaris.
+  ret->std_dict= dictionary_new ( ret->mem, err );
+  if ( ret->std_dict == NULL ) goto error;
+  std_dict_addr=
+    (((uint32_t) ret->mem->sf_mem[0x8])<<8) |
+    ((uint32_t) ret->mem->sf_mem[0x9])
+    ;
+  if ( !dictionary_load ( ret->std_dict, std_dict_addr, err ) ) goto error;
+  ret->usr_dict= dictionary_new ( ret->mem, err );
+  if ( ret->usr_dict == NULL ) goto error;
   
   return ret;
 
