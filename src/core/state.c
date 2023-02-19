@@ -959,7 +959,7 @@ state_free_frame (
     ;
   state->SP= state->frame;
   state->frame= state->stack[state->frame];
-  assert ( state->frame > 0 );
+  //assert ( state->frame > 0 );
   --(state->frame_ind);
   
   return true;

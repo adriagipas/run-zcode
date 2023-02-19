@@ -1041,6 +1041,9 @@ decode_next_inst (
       ins->name= INSTRUCTION_NAME_RET_POPPED;
       break;
 
+    case 0xba: // quit;
+      ins->name= INSTRUCTION_NAME_QUIT;
+      break;
     case 0xbb: // new_line;
       ins->name= INSTRUCTION_NAME_NEW_LINE;
       break;

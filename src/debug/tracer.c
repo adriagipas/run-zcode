@@ -97,6 +97,7 @@ get_inst_name (
     case INSTRUCTION_NAME_PULL            : return "pull            ";
     case INSTRUCTION_NAME_PUSH            : return "push            ";
     case INSTRUCTION_NAME_PUT_PROP        : return "put_prop        ";
+    case INSTRUCTION_NAME_QUIT            : return "quit            ";
     case INSTRUCTION_NAME_READ            : return "read            ";
     case INSTRUCTION_NAME_RET             : return "ret             ";
     case INSTRUCTION_NAME_RET_POPPED      : return "ret_popped      ";

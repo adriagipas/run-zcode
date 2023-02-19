@@ -198,7 +198,7 @@ write_var (
            const uint8_t    var,
            const uint16_t   val,
            char           **err
-          )
+           )
 {
 
   State *state;
@@ -722,7 +722,7 @@ ret_val (
     return false;
   if ( !discard )
     {
-      if ( !state_writevar ( intp->state, res_var, val, err ) )
+      if ( !write_var ( intp, res_var, val, err ) )
         return false;
     }
   
@@ -2388,6 +2388,9 @@ exec_next_inst (
       if ( !ret_val ( intp, op1, err ) ) return RET_ERROR;
       break;
 
+    case 0xba: // quit
+      return RET_STOP;
+      break;
     case 0xbb: // new_line
       if ( !screen_print ( intp->screen, "\n", err ) ) return RET_ERROR;
       break;
