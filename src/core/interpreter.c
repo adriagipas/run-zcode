@@ -1659,6 +1659,50 @@ sread (
 } // end sread
 
 
+static bool
+inst_be (
+         Interpreter  *intp,
+         char        **err
+         )
+{
+
+  State *state;
+  uint8_t opcode,result_var;
+  uint16_t op1,op2,res;
+  int16_t places;
+  int nops;
+  operand_t ops[8];
+
+  
+  state= intp->state;
+  if ( !memory_map_READB ( intp->mem, state->PC++, &opcode, true, err ) )
+    return false;
+  switch ( opcode )
+    {
+
+    case 0x02: // log_shift
+      if ( !read_var_ops_store ( intp, ops, &nops, 2, &result_var, err ) )
+        return RET_ERROR;
+      if ( !op_to_u16 ( intp, &(ops[0]), &op1, err ) ) return false;
+      if ( !op_to_u16 ( intp, &(ops[1]), &op2, err ) ) return false;
+      places= (int16_t) op2;
+      if ( places > 0 )       res= op1>>places;
+      else if ( places == 0 ) res= op1;
+      else                    res= op1<<(-places);
+      if ( !write_var ( intp, result_var, res, err ) ) return false;
+      break;
+      
+    default: // Unknown
+      msgerror ( err, "Unknown instruction opcode BE %02X (%d)",
+                 opcode, opcode );
+      return false;
+    }
+  
+  return true;
+  
+} // end inst_be
+
+
 static int
 exec_next_inst (
                 Interpreter  *intp,
@@ -2382,6 +2426,11 @@ exec_next_inst (
     case 0xb2: // print
       if ( !print ( intp, err ) ) return RET_ERROR;
       break;
+    case 0xb3: // print_ret
+      if ( !print ( intp, err ) ) return RET_ERROR;
+      if ( !screen_print ( intp->screen, "\n", err ) ) return RET_ERROR;
+      if ( !ret_val ( intp, 1, err ) ) return RET_ERROR;
+      break;
       
     case 0xb8: // ret_popped
       if ( !state_readvar ( intp->state, 0, &op1, err ) ) return RET_ERROR;
@@ -2393,6 +2442,11 @@ exec_next_inst (
       break;
     case 0xbb: // new_line
       if ( !screen_print ( intp->screen, "\n", err ) ) return RET_ERROR;
+      break;
+
+    case 0xbe: // extended
+      if ( intp->version < 5 ) goto wrong_version;
+      if ( !inst_be ( intp, err ) ) return RET_ERROR;
       break;
       
     case 0xc1: // je
@@ -2419,7 +2473,15 @@ exec_next_inst (
       if ( !branch ( intp, ((int16_t) op1) > ((int16_t) op2), err ) )
         return RET_ERROR;
       break;
-      
+
+    case 0xc8: // or
+      if ( !read_var_ops_store ( intp, ops, &nops, 2, &result_var, err ) )
+        return RET_ERROR;
+      if ( !op_to_u16 ( intp, &(ops[0]), &op1, err ) ) return RET_ERROR;
+      if ( !op_to_u16 ( intp, &(ops[1]), &op2, err ) ) return RET_ERROR;
+      res= op1|op2;
+      if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
+      break;
     case 0xc9: // and
       if ( !read_var_ops_store ( intp, ops, &nops, 2, &result_var, err ) )
         return RET_ERROR;
@@ -2463,7 +2525,15 @@ exec_next_inst (
       SET_U8TOU16(res_u8,res);
       if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
       break;
-      
+
+    case 0xd4: // add
+      if ( !read_var_ops_store ( intp, ops, &nops, 2, &result_var, err ) )
+        return RET_ERROR;
+      if ( !op_to_u16 ( intp, &(ops[0]), &op1, err ) ) return RET_ERROR;
+      if ( !op_to_u16 ( intp, &(ops[1]), &op2, err ) ) return RET_ERROR;
+      res= (uint16_t) (((int16_t) op1) + ((int16_t) op2));
+      if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
+      break;
     case 0xd5: // sub
       if ( !read_var_ops_store ( intp, ops, &nops, 2, &result_var, err ) )
         return RET_ERROR;
@@ -2472,7 +2542,32 @@ exec_next_inst (
       res= (uint16_t) (((int16_t) op1) - ((int16_t) op2));
       if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
       break;
-
+    case 0xd6: // mul
+      if ( !read_var_ops_store ( intp, ops, &nops, 2, &result_var, err ) )
+        return RET_ERROR;
+      if ( !op_to_u16 ( intp, &(ops[0]), &op1, err ) ) return RET_ERROR;
+      if ( !op_to_u16 ( intp, &(ops[1]), &op2, err ) ) return RET_ERROR;
+      res= S32_U16(U16_S32(op1) * U16_S32(op2));
+      if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
+      break;
+    case 0xd7: // div
+      if ( !read_var_ops_store ( intp, ops, &nops, 2, &result_var, err ) )
+        return RET_ERROR;
+      if ( !op_to_u16 ( intp, &(ops[0]), &op1, err ) ) return RET_ERROR;
+      if ( !op_to_u16 ( intp, &(ops[1]), &op2, err ) ) return RET_ERROR;
+      if ( op2 == 0 ) goto division0;
+      res= (uint16_t) (((int16_t) op1) / ((int16_t) op2));
+      if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
+      break;
+    case 0xd8: // mod
+      if ( !read_var_ops_store ( intp, ops, &nops, 2, &result_var, err ) )
+        return RET_ERROR;
+      if ( !op_to_u16 ( intp, &(ops[0]), &op1, err ) ) return RET_ERROR;
+      if ( !op_to_u16 ( intp, &(ops[1]), &op2, err ) ) return RET_ERROR;
+      if ( op2 == 0 ) goto division0;
+      res= (uint16_t) (((int16_t) op1) % ((int16_t) op2));
+      if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
+      break;
     case 0xd9: // call_2s
       if ( intp->version < 4 ) goto wrong_version;
       if ( !read_var_ops_store ( intp, ops, &nops, 2, &result_var, err ) )

@@ -85,6 +85,7 @@ get_inst_name (
     case INSTRUCTION_NAME_JZ              : return "jz              ";
     case INSTRUCTION_NAME_LOADB           : return "loadb           ";
     case INSTRUCTION_NAME_LOADW           : return "loadw           ";
+    case INSTRUCTION_NAME_LOG_SHIFT       : return "log_shift       ";
     case INSTRUCTION_NAME_MOD             : return "mod             ";
     case INSTRUCTION_NAME_MUL             : return "mul             ";
     case INSTRUCTION_NAME_NEW_LINE        : return "new_line        ";
@@ -94,6 +95,7 @@ get_inst_name (
     case INSTRUCTION_NAME_PRINT_CHAR      : return "print_char      ";
     case INSTRUCTION_NAME_PRINT_NUM       : return "print_num       ";
     case INSTRUCTION_NAME_PRINT_PADDR     : return "print_paddr     ";
+    case INSTRUCTION_NAME_PRINT_RET       : return "print_ret       ";
     case INSTRUCTION_NAME_PULL            : return "pull            ";
     case INSTRUCTION_NAME_PUSH            : return "push            ";
     case INSTRUCTION_NAME_PUT_PROP        : return "put_prop        ";

@@ -543,6 +543,41 @@ ins_var_2ops (
 
 
 static bool
+inst_be (
+         Instruction      *ins,
+         const MemoryMap  *mem,
+         uint32_t         *addr,
+         char            **err
+         )
+{
+
+  uint8_t opcode;
+  
+  
+  // Opcode
+  if ( !memory_map_READB ( mem, *addr, &opcode, true, err ) )
+    return false;
+  ++(*addr);
+  ins->bytes[ins->nbytes++]= opcode;
+  switch ( opcode )
+    {
+
+    case 0x02: // log_shift
+      if ( !read_var_ops_store ( ins, mem, addr, err ) ) return false;
+      if ( !ins_var_2ops ( ins, INSTRUCTION_NAME_LOG_SHIFT, err ) )
+        return false;
+      break;
+      
+    default: // Descodifica com UNK
+      break;
+    }
+  
+  return true;
+  
+} // end inst_be
+
+
+static bool
 decode_next_inst (
                   Instruction      *ins,
                   const MemoryMap  *mem,
@@ -1036,6 +1071,9 @@ decode_next_inst (
     case 0xb2: // print
       ins->name= INSTRUCTION_NAME_PRINT;
       break;
+    case 0xb3: // print_ret
+      ins->name= INSTRUCTION_NAME_PRINT_RET;
+      break;
       
     case 0xb8: // ret_popped;
       ins->name= INSTRUCTION_NAME_RET_POPPED;
@@ -1046,6 +1084,13 @@ decode_next_inst (
       break;
     case 0xbb: // new_line;
       ins->name= INSTRUCTION_NAME_NEW_LINE;
+      break;
+
+    case 0xbe: // extended
+      if ( mem->sf_mem[0] >= 5 )
+        {
+          if ( !inst_be ( ins, mem, &addr, err ) ) return false;
+        }
       break;
       
     case 0xc1: // je
@@ -1059,7 +1104,11 @@ decode_next_inst (
       ins->name= INSTRUCTION_NAME_JG;
       if ( !read_branch ( ins, mem, &addr, err ) ) return false;
       break;
-      
+
+    case 0xc8: // or
+      if ( !read_var_ops_store ( ins, mem, &addr, err ) ) return false;
+      if ( !ins_var_2ops ( ins, INSTRUCTION_NAME_OR, err ) ) return false;
+      break;
     case 0xc9: // and
       if ( !read_var_ops_store ( ins, mem, &addr, err ) ) return false;
       if ( !ins_var_2ops ( ins, INSTRUCTION_NAME_AND, err ) ) return false;
@@ -1078,12 +1127,27 @@ decode_next_inst (
       if ( !read_var_ops_store ( ins, mem, &addr, err ) ) return false;
       if ( !ins_var_2ops ( ins, INSTRUCTION_NAME_LOADB, err ) ) return false;
       break;
-      
+
+    case 0xd4: // add
+      if ( !read_var_ops_store ( ins, mem, &addr, err ) ) return false;
+      if ( !ins_var_2ops ( ins, INSTRUCTION_NAME_ADD, err ) ) return false;
+      break;
     case 0xd5: // sub
       if ( !read_var_ops_store ( ins, mem, &addr, err ) ) return false;
       if ( !ins_var_2ops ( ins, INSTRUCTION_NAME_SUB, err ) ) return false;
       break;
-
+    case 0xd6: // mul
+      if ( !read_var_ops_store ( ins, mem, &addr, err ) ) return false;
+      if ( !ins_var_2ops ( ins, INSTRUCTION_NAME_MUL, err ) ) return false;
+      break;
+    case 0xd7: // div
+      if ( !read_var_ops_store ( ins, mem, &addr, err ) ) return false;
+      if ( !ins_var_2ops ( ins, INSTRUCTION_NAME_DIV, err ) ) return false;
+      break;
+    case 0xd8: // mod
+      if ( !read_var_ops_store ( ins, mem, &addr, err ) ) return false;
+      if ( !ins_var_2ops ( ins, INSTRUCTION_NAME_MOD, err ) ) return false;
+      break;
     case 0xd9: // call_2s NOTA!! No cal comprovar que han de ser 2
       if ( mem->sf_mem[0] >= 4 )
         {

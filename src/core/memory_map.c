@@ -343,7 +343,7 @@ readvar (
   uint16_t ret;
   
   
-  offset= mem->global_var_offset + ind;
+  offset= mem->global_var_offset + ind*2;
   ret=
     (((uint16_t) mem->dyn_mem[offset])<<8) |
     ((uint16_t) mem->dyn_mem[offset+1])
@@ -385,7 +385,7 @@ writevar (
   uint32_t offset;
   
 
-  offset= mem->global_var_offset + ind;
+  offset= mem->global_var_offset + ind*2;
   mem->dyn_mem[offset]= (uint8_t) (val>>8);
   mem->dyn_mem[offset+1]= (uint8_t) val;
   
