@@ -70,13 +70,17 @@ get_inst_name (
     {
     case INSTRUCTION_NAME_ADD             : return "add             ";
     case INSTRUCTION_NAME_AND             : return "and             ";
+    case INSTRUCTION_NAME_ART_SHIFT       : return "art_shift       ";
     case INSTRUCTION_NAME_CALL            : return "call            ";
     case INSTRUCTION_NAME_CHECK_ARG_COUNT : return "check_arg_count ";
+    case INSTRUCTION_NAME_DEC             : return "dec             ";
+    case INSTRUCTION_NAME_DEC_CHK         : return "dec_chk         ";
     case INSTRUCTION_NAME_DIV             : return "div             ";
     case INSTRUCTION_NAME_GET_PROP        : return "get_prop        ";
     case INSTRUCTION_NAME_GET_PROP_ADDR   : return "get_prop_addr   ";
     case INSTRUCTION_NAME_GET_PROP_LEN    : return "get_prop_len    ";
     case INSTRUCTION_NAME_INC             : return "inc             ";
+    case INSTRUCTION_NAME_INC_CHK         : return "inc_chk         ";
     case INSTRUCTION_NAME_JE              : return "je              ";
     case INSTRUCTION_NAME_JG              : return "jg              ";
     case INSTRUCTION_NAME_JIN             : return "jin             ";
@@ -89,6 +93,7 @@ get_inst_name (
     case INSTRUCTION_NAME_MOD             : return "mod             ";
     case INSTRUCTION_NAME_MUL             : return "mul             ";
     case INSTRUCTION_NAME_NEW_LINE        : return "new_line        ";
+    case INSTRUCTION_NAME_NOT             : return "not             ";
     case INSTRUCTION_NAME_OR              : return "or              ";
     case INSTRUCTION_NAME_PRINT           : return "print           ";
     case INSTRUCTION_NAME_PRINT_ADDR      : return "print_addr      ";

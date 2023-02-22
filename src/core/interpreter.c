@@ -1682,13 +1682,24 @@ inst_be (
 
     case 0x02: // log_shift
       if ( !read_var_ops_store ( intp, ops, &nops, 2, &result_var, err ) )
-        return RET_ERROR;
+        return false;
       if ( !op_to_u16 ( intp, &(ops[0]), &op1, err ) ) return false;
       if ( !op_to_u16 ( intp, &(ops[1]), &op2, err ) ) return false;
       places= (int16_t) op2;
-      if ( places > 0 )       res= op1>>places;
+      if ( places > 0 )       res= op1<<places;
       else if ( places == 0 ) res= op1;
-      else                    res= op1<<(-places);
+      else                    res= op1>>(-places);
+      if ( !write_var ( intp, result_var, res, err ) ) return false;
+      break;
+    case 0x03: // art_shift
+      if ( !read_var_ops_store ( intp, ops, &nops, 2, &result_var, err ) )
+        return false;
+      if ( !op_to_u16 ( intp, &(ops[0]), &op1, err ) ) return false;
+      if ( !op_to_u16 ( intp, &(ops[1]), &op2, err ) ) return false;
+      places= (int16_t) op2;
+      if ( places > 0 )       res= op1<<places;
+      else if ( places == 0 ) res= op1;
+      else                    res= (uint16_t) (((int16_t) op1)>>(-places));
       if ( !write_var ( intp, result_var, res, err ) ) return false;
       break;
       
@@ -1744,7 +1755,24 @@ exec_next_inst (
       if ( !branch ( intp, ((int16_t) op1) > ((int16_t) op2), err ) )
         return RET_ERROR;
       break;
-
+    case 0x04: // dec_chk
+      if ( !read_small_small ( intp, &op1_u8, &op2_u8, err )) return RET_ERROR;
+      if ( !read_var ( intp, op1_u8, &op1, err ) ) return RET_ERROR;
+      --op1;
+      if ( !write_var ( intp, op1_u8, op1, err ) ) return RET_ERROR;
+      SET_U8TOU16(op2_u8,op2);
+      if ( !branch ( intp, (int16_t) op1 < (int16_t) op2, err ) )
+        return RET_ERROR;
+      break;
+    case 0x05: // inc_chk
+      if ( !read_small_small ( intp, &op1_u8, &op2_u8, err )) return RET_ERROR;
+      if ( !read_var ( intp, op1_u8, &op1, err ) ) return RET_ERROR;
+      ++op1;
+      if ( !write_var ( intp, op1_u8, op1, err ) ) return RET_ERROR;
+      SET_U8TOU16(op2_u8,op2);
+      if ( !branch ( intp, (int16_t) op1 > (int16_t) op2, err ) )
+        return RET_ERROR;
+      break;
     case 0x06: // jin
       if ( !read_small_small ( intp, &op1_u8, &op2_u8, err ) ) return RET_ERROR;
       SET_U8TOU16(op1_u8,op1);
@@ -1880,7 +1908,22 @@ exec_next_inst (
       if ( !branch ( intp, ((int16_t) op1) > ((int16_t) op2), err ) )
         return RET_ERROR;
       break;
-
+    case 0x24: // dec_chk
+      if ( !read_small_var ( intp, &op1_u8, &op2, err )) return RET_ERROR;
+      if ( !read_var ( intp, op1_u8, &op1, err ) ) return RET_ERROR;
+      --op1;
+      if ( !write_var ( intp, op1_u8, op1, err ) ) return RET_ERROR;
+      if ( !branch ( intp, (int16_t) op1 < (int16_t) op2, err ) )
+        return RET_ERROR;
+      break;
+    case 0x25: // inc_chk
+      if ( !read_small_var ( intp, &op1_u8, &op2, err )) return RET_ERROR;
+      if ( !read_var ( intp, op1_u8, &op1, err ) ) return RET_ERROR;
+      ++op1;
+      if ( !write_var ( intp, op1_u8, op1, err ) ) return RET_ERROR;
+      if ( !branch ( intp, (int16_t) op1 > (int16_t) op2, err ) )
+        return RET_ERROR;
+      break;
     case 0x26: // jin
       if ( !read_small_var ( intp, &op1_u8, &op2, err ) ) return RET_ERROR;
       SET_U8TOU16(op1_u8,op1);
@@ -2002,7 +2045,16 @@ exec_next_inst (
       if ( !branch ( intp, ((int16_t) op1) > ((int16_t) op2), err ) )
         return RET_ERROR;
       break;
-
+    case 0x44: // dec_chk
+      msgerror ( err, "Failed to execute @dec_chnk: Trying to reference"
+                 " a variable with a variable" );
+      return RET_ERROR;
+      break;
+    case 0x45: // inc_chk
+      msgerror ( err, "Failed to execute @inc_chnk: Trying to reference"
+                 " a variable with a variable" );
+      return RET_ERROR;
+      break;
     case 0x46: // jin
       if ( !read_var_small ( intp, &op1, &op2_u8, err ) ) return RET_ERROR;
       SET_U8TOU16(op2_u8,op2);
@@ -2122,7 +2174,16 @@ exec_next_inst (
       if ( !branch ( intp, ((int16_t) op1) > ((int16_t) op2), err ) )
         return RET_ERROR;
       break;
-
+    case 0x64: // dec_chk
+      msgerror ( err, "Failed to execute @dec_chnk: Trying to reference"
+                 " a variable with a variable" );
+      return RET_ERROR;
+      break;
+    case 0x65: // inc_chk
+      msgerror ( err, "Failed to execute @inc_chnk: Trying to reference"
+                 " a variable with a variable" );
+      return RET_ERROR;
+      break;
     case 0x66: // jin
       if ( !read_var_var ( intp, &op1, &op2, err ) ) return RET_ERROR;
       if ( !jin ( intp, op1, op2, err ) ) return RET_ERROR;
@@ -2233,7 +2294,11 @@ exec_next_inst (
                  " a variable with a large constant" );
       return RET_ERROR;
       break;
-
+    case 0x86: // dec
+      msgerror ( err, "Failed to execute @dec: Trying to reference"
+                 " a variable with a large constant" );
+      return RET_ERROR;
+      break;
     case 0x87: // print_addr
       if ( !memory_map_READW ( intp->mem, state->PC, &op1, true, err ) )
         return RET_ERROR;
@@ -2305,7 +2370,13 @@ exec_next_inst (
       ++op1;
       if ( !write_var ( intp, op1_u8, op1, err ) ) return RET_ERROR;
       break;
-
+    case 0x96: // dec
+      if ( !memory_map_READB ( intp->mem, state->PC++, &op1_u8, true, err ) )
+        return RET_ERROR;
+      if ( !read_var ( intp, op1_u8, &op1, err ) ) return RET_ERROR;
+      --op1;
+      if ( !write_var ( intp, op1_u8, op1, err ) ) return RET_ERROR;
+      break;
     case 0x97: // print_addr
       if ( !memory_map_READB ( intp->mem, state->PC++, &op1_u8, true, err ) )
         return RET_ERROR;
@@ -2374,7 +2445,11 @@ exec_next_inst (
                  " a variable with a variable" );
       return RET_ERROR;
       break;
-
+    case 0xa6: // dec. NOTA!! Açò és possible?
+      msgerror ( err, "Failed to execute @dec: Trying to reference"
+                 " a variable with a variable" );
+      return RET_ERROR;
+      break;
     case 0xa7: // print_addr
       if ( !read_op1_var ( intp, &op1, err ) ) return RET_ERROR;
       if ( !print_addr ( intp, op1, NULL, false, err ) ) return RET_ERROR;
@@ -2474,6 +2549,29 @@ exec_next_inst (
         return RET_ERROR;
       break;
 
+    case 0xc4: // dec_chk
+      if ( !read_var_ops ( intp, ops, &nops, 2, err ) ) return RET_ERROR;
+      if ( !op_to_refvar ( intp, &(ops[0]), &op1_u8, err ) )
+        return RET_ERROR;
+      if ( !op_to_u16 ( intp, &(ops[1]), &op2, err ) ) return RET_ERROR;
+      if ( !read_var ( intp, op1_u8, &op1, err ) ) return RET_ERROR;
+      --op1;
+      if ( !write_var ( intp, op1_u8, op1, err ) ) return RET_ERROR;
+      if ( !branch ( intp, (int16_t) op1 < (int16_t) op2, err ) )
+        return RET_ERROR;
+      break;
+    case 0xc5: // inc_chk
+      if ( !read_var_ops ( intp, ops, &nops, 2, err ) ) return RET_ERROR;
+      if ( !op_to_refvar ( intp, &(ops[0]), &op1_u8, err ) )
+        return RET_ERROR;
+      if ( !op_to_u16 ( intp, &(ops[1]), &op2, err ) ) return RET_ERROR;
+      if ( !read_var ( intp, op1_u8, &op1, err ) ) return RET_ERROR;
+      ++op1;
+      if ( !write_var ( intp, op1_u8, op1, err ) ) return RET_ERROR;
+      if ( !branch ( intp, (int16_t) op1 > (int16_t) op2, err ) )
+        return RET_ERROR;
+      break;
+      
     case 0xc8: // or
       if ( !read_var_ops_store ( intp, ops, &nops, 2, &result_var, err ) )
         return RET_ERROR;
@@ -2667,7 +2765,15 @@ exec_next_inst (
       if ( !op_to_u16 ( intp, &(ops[0]), &op1, err ) ) return RET_ERROR;
       screen_set_style ( intp->screen, op1 );
       break;
-      
+
+    case 0xf8: // not
+      if ( intp->version < 5 ) goto wrong_version;
+      if ( !read_var_ops_store ( intp, ops, &nops, 1, &result_var, err ) )
+        return RET_ERROR;
+      if ( !op_to_u16 ( intp, &(ops[0]), &op1, err ) ) return false;
+      res= ~op1;
+      if ( !write_var ( intp, result_var, res, err ) ) return false;
+      break;
     case 0xf9: // call_vn
       if ( intp->version < 5 ) goto wrong_version;
       if ( !read_var_ops ( intp, ops, &nops, -1, err ) )

@@ -567,6 +567,11 @@ inst_be (
       if ( !ins_var_2ops ( ins, INSTRUCTION_NAME_LOG_SHIFT, err ) )
         return false;
       break;
+    case 0x03: // art_shift
+      if ( !read_var_ops_store ( ins, mem, addr, err ) ) return false;
+      if ( !ins_var_2ops ( ins, INSTRUCTION_NAME_ART_SHIFT, err ) )
+        return false;
+      break;
       
     default: // Descodifica com UNK
       break;
@@ -610,7 +615,14 @@ decode_next_inst (
       if ( !ins_2op_branch ( ins, mem, &addr, INSTRUCTION_NAME_JG, err ) )
         return false;
       break;
-
+    case 0x04: // dec_chk
+      if ( !ins_2op_branch ( ins, mem, &addr, INSTRUCTION_NAME_DEC_CHK, err ) )
+        return false;
+      break;
+    case 0x05: // inc_chk
+      if ( !ins_2op_branch ( ins, mem, &addr, INSTRUCTION_NAME_INC_CHK, err ) )
+        return false;
+      break;
     case 0x06: // jin
       if ( !ins_2op_branch ( ins, mem, &addr, INSTRUCTION_NAME_JIN, err ) )
         return false;
@@ -687,7 +699,14 @@ decode_next_inst (
       if ( !ins_2op_branch ( ins, mem, &addr, INSTRUCTION_NAME_JG, err ) )
         return false;
       break;
-
+    case 0x24: // dec_chk
+      if ( !ins_2op_branch ( ins, mem, &addr, INSTRUCTION_NAME_DEC_CHK, err ) )
+        return false;
+      break;
+    case 0x25: // inc_chk
+      if ( !ins_2op_branch ( ins, mem, &addr, INSTRUCTION_NAME_INC_CHK, err ) )
+        return false;
+      break;
     case 0x26: // jin
       if ( !ins_2op_branch ( ins, mem, &addr, INSTRUCTION_NAME_JIN, err ) )
         return false;
@@ -764,7 +783,14 @@ decode_next_inst (
       if ( !ins_2op_branch ( ins, mem, &addr, INSTRUCTION_NAME_JG, err ) )
         return false;
       break;
-
+    case 0x44: // dec_chk
+      if ( !ins_2op_branch ( ins, mem, &addr, INSTRUCTION_NAME_DEC_CHK, err ) )
+        return false;
+      break;
+    case 0x45: // inc_chk
+      if ( !ins_2op_branch ( ins, mem, &addr, INSTRUCTION_NAME_INC_CHK, err ) )
+        return false;
+      break;
     case 0x46: // jin
       if ( !ins_2op_branch ( ins, mem, &addr, INSTRUCTION_NAME_JIN, err ) )
         return false;
@@ -841,7 +867,14 @@ decode_next_inst (
       if ( !ins_2op_branch ( ins, mem, &addr, INSTRUCTION_NAME_JG, err ) )
         return false;
       break;
-
+    case 0x64: // dec_chk
+      if ( !ins_2op_branch ( ins, mem, &addr, INSTRUCTION_NAME_DEC_CHK, err ) )
+        return false;
+      break;
+    case 0x65: // inc_chk
+      if ( !ins_2op_branch ( ins, mem, &addr, INSTRUCTION_NAME_INC_CHK, err ) )
+        return false;
+      break;
     case 0x66: // jin
       if ( !ins_2op_branch ( ins, mem, &addr, INSTRUCTION_NAME_JIN, err ) )
         return false;
@@ -921,7 +954,11 @@ decode_next_inst (
         return false;
       if ( !op_to_ref ( ins, 0, err ) ) return false;
       break;
-
+    case 0x86: // dec
+      if ( !ins_1op ( ins, mem, &addr, INSTRUCTION_NAME_DEC, err ) )
+        return false;
+      if ( !op_to_ref ( ins, 0, err ) ) return false;
+      break;
     case 0x87: // print_addr
       if ( !ins_1op ( ins, mem, &addr, INSTRUCTION_NAME_PRINT_ADDR, err ) )
         return false;
@@ -973,7 +1010,11 @@ decode_next_inst (
         return false;
       if ( !op_to_ref ( ins, 0, err ) ) return false;
       break;
-
+    case 0x96: // dec
+      if ( !ins_1op ( ins, mem, &addr, INSTRUCTION_NAME_DEC, err ) )
+        return false;
+      if ( !op_to_ref ( ins, 0, err ) ) return false;
+      break;
     case 0x97: // print_addr
       if ( !ins_1op ( ins, mem, &addr, INSTRUCTION_NAME_PRINT_ADDR, err ) )
         return false;
@@ -1025,7 +1066,11 @@ decode_next_inst (
         return false;
       if ( !op_to_ref ( ins, 0, err ) ) return false;
       break;
-
+    case 0xa6: // dec
+      if ( !ins_1op ( ins, mem, &addr, INSTRUCTION_NAME_DEC, err ) )
+        return false;
+      if ( !op_to_ref ( ins, 0, err ) ) return false;
+      break;
     case 0xa7: // print_addr
       if ( !ins_1op ( ins, mem, &addr, INSTRUCTION_NAME_PRINT_ADDR, err ) )
         return false;
@@ -1104,7 +1149,17 @@ decode_next_inst (
       ins->name= INSTRUCTION_NAME_JG;
       if ( !read_branch ( ins, mem, &addr, err ) ) return false;
       break;
-
+    case 0xc4: // dec_chk
+      if ( !read_var_ops ( ins, mem, &addr, err ) ) return false;
+      if ( !ins_var_2ops ( ins, INSTRUCTION_NAME_DEC_CHK, err ) ) return false;
+      if ( !read_branch ( ins, mem, &addr, err ) ) return false;
+      break;
+    case 0xc5: // inc_chk
+      if ( !read_var_ops ( ins, mem, &addr, err ) ) return false;
+      if ( !ins_var_2ops ( ins, INSTRUCTION_NAME_INC_CHK, err ) ) return false;
+      if ( !read_branch ( ins, mem, &addr, err ) ) return false;
+      break;
+      
     case 0xc8: // or
       if ( !read_var_ops_store ( ins, mem, &addr, err ) ) return false;
       if ( !ins_var_2ops ( ins, INSTRUCTION_NAME_OR, err ) ) return false;
@@ -1222,7 +1277,11 @@ decode_next_inst (
             return false;
         }
       break;
-      
+
+    case 0xf8: // not
+      if ( !read_var_ops_store ( ins, mem, &addr, err ) ) return false;
+      if ( !ins_var_1op ( ins, INSTRUCTION_NAME_NOT, err ) ) return false;
+      break;
     case 0xf9: // call_vn
       if ( mem->sf_mem[0] >= 5 )
         {
