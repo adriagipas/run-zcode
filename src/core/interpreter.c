@@ -1724,6 +1724,7 @@ exec_next_inst (
   int nops,n;
   uint8_t opcode,result_var,op1_u8,op2_u8,res_u8;
   uint16_t op1,op2,op3,res,tmp16;
+  uint32_t addr;
   State *state;
   operand_t ops[8];
   bool cond;
@@ -1817,7 +1818,8 @@ exec_next_inst (
         return RET_ERROR;
       SET_U8TOU16(op1_u8,op1);
       SET_U8TOU16(op2_u8,op2);
-      if ( !memory_map_READW ( intp->mem, op1 + 2*op2, &res, false, err ) )
+      addr= ((uint32_t) op1) + (uint32_t) (2*(int32_t) ((int16_t) op2));
+      if ( !memory_map_READW ( intp->mem, addr, &res, false, err ) )
         return RET_ERROR;
       if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
       break;
@@ -1826,7 +1828,8 @@ exec_next_inst (
         return RET_ERROR;
       SET_U8TOU16(op1_u8,op1);
       SET_U8TOU16(op2_u8,op2);
-      if ( !memory_map_READB ( intp->mem, op1 + op2, &res_u8, false, err ) )
+      addr= ((uint32_t) op1) + (uint32_t) ((int32_t) ((int16_t) op2));
+      if ( !memory_map_READB ( intp->mem, addr, &res_u8, false, err ) )
         return RET_ERROR;
       SET_U8TOU16(res_u8,res);
       if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
@@ -1962,7 +1965,8 @@ exec_next_inst (
       if ( !read_small_var_store ( intp, &op1_u8, &op2, &result_var, err ) )
         return RET_ERROR;
       SET_U8TOU16(op1_u8,op1);
-      if ( !memory_map_READW ( intp->mem, op1 + 2*op2, &res, false, err ) )
+      addr= ((uint32_t) op1) + (uint32_t) (2*(int32_t) ((int16_t) op2));
+      if ( !memory_map_READW ( intp->mem, addr, &res, false, err ) )
         return RET_ERROR;
       if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
       break;
@@ -1970,7 +1974,8 @@ exec_next_inst (
       if ( !read_small_var_store ( intp, &op1_u8, &op2, &result_var, err ) )
         return RET_ERROR;
       SET_U8TOU16(op1_u8,op1);
-      if ( !memory_map_READB ( intp->mem, op1 + op2, &res_u8, false, err ) )
+      addr= ((uint32_t) op1) + (uint32_t) ((int32_t) ((int16_t) op2));
+      if ( !memory_map_READB ( intp->mem, addr, &res_u8, false, err ) )
         return RET_ERROR;
       SET_U8TOU16(res_u8,res);
       if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
@@ -2094,7 +2099,8 @@ exec_next_inst (
       if ( !read_var_small_store ( intp, &op1, &op2_u8, &result_var, err ) )
         return RET_ERROR;
       SET_U8TOU16(op2_u8,op2);
-      if ( !memory_map_READW ( intp->mem, op1 + 2*op2, &res, false, err ) )
+      addr= ((uint32_t) op1) + (uint32_t) (2*(int32_t) ((int16_t) op2));
+      if ( !memory_map_READW ( intp->mem, addr, &res, false, err ) )
         return RET_ERROR;
       if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
       break;
@@ -2102,7 +2108,8 @@ exec_next_inst (
       if ( !read_var_small_store ( intp, &op1, &op2_u8, &result_var, err ) )
         return RET_ERROR;
       SET_U8TOU16(op2_u8,op2);
-      if ( !memory_map_READB ( intp->mem, op1 + op2, &res_u8, false, err ) )
+      addr= ((uint32_t) op1) + (uint32_t) ((int32_t) ((int16_t) op2));
+      if ( !memory_map_READB ( intp->mem, addr, &res_u8, false, err ) )
         return RET_ERROR;
       SET_U8TOU16(res_u8,res);
       if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
@@ -2217,14 +2224,16 @@ exec_next_inst (
     case 0x6f: // loadw
       if ( !read_var_var_store ( intp, &op1, &op2, &result_var, err ) )
         return RET_ERROR;
-      if ( !memory_map_READW ( intp->mem, op1 + 2*op2, &res, false, err ) )
+      addr= ((uint32_t) op1) + (uint32_t) (2*(int32_t) ((int16_t) op2));
+      if ( !memory_map_READW ( intp->mem, addr, &res, false, err ) )
         return RET_ERROR;
       if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
       break;
     case 0x70: // loadb
       if ( !read_var_var_store ( intp, &op1, &op2, &result_var, err ) )
         return RET_ERROR;
-      if ( !memory_map_READB ( intp->mem, op1 + op2, &res_u8, false, err ) )
+      addr= ((uint32_t) op1) + (uint32_t) ((int32_t) ((int16_t) op2));
+      if ( !memory_map_READB ( intp->mem, addr, &res_u8, false, err ) )
         return RET_ERROR;
       SET_U8TOU16(res_u8,res);
       if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
@@ -2609,7 +2618,8 @@ exec_next_inst (
         return RET_ERROR;
       if ( !op_to_u16 ( intp, &(ops[0]), &op1, err ) ) return RET_ERROR;
       if ( !op_to_u16 ( intp, &(ops[1]), &op2, err ) ) return RET_ERROR;
-      if ( !memory_map_READW ( intp->mem, op1 + 2*op2, &res, false, err ) )
+      addr= ((uint32_t) op1) + (uint32_t) (2*(int32_t) ((int16_t) op2));
+      if ( !memory_map_READW ( intp->mem, addr, &res, false, err ) )
         return RET_ERROR;
       if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
       break;
@@ -2618,7 +2628,8 @@ exec_next_inst (
         return RET_ERROR;
       if ( !op_to_u16 ( intp, &(ops[0]), &op1, err ) ) return RET_ERROR;
       if ( !op_to_u16 ( intp, &(ops[1]), &op2, err ) ) return RET_ERROR;
-      if ( !memory_map_READB ( intp->mem, op1 + op2, &res_u8, false, err ) )
+      addr= ((uint32_t) op1) + (uint32_t) ((int32_t) ((int16_t) op2));
+      if ( !memory_map_READB ( intp->mem, addr, &res_u8, false, err ) )
         return RET_ERROR;
       SET_U8TOU16(res_u8,res);
       if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
@@ -2690,7 +2701,8 @@ exec_next_inst (
       if ( !op_to_u16 ( intp, &(ops[0]), &op1, err ) ) return RET_ERROR;
       if ( !op_to_u16 ( intp, &(ops[1]), &op2, err ) ) return RET_ERROR;
       if ( !op_to_u16 ( intp, &(ops[2]), &op3, err ) ) return RET_ERROR;
-      if ( !memory_map_WRITEW ( intp->mem, op1 + 2*op2, op3, false, err ) )
+      addr= ((uint32_t) op1) + (uint32_t) (2*(int32_t) ((int16_t) op2));
+      if ( !memory_map_WRITEW ( intp->mem, addr, op3, false, err ) )
         return RET_ERROR;
       break;
     case 0xe2: // storeb
@@ -2698,7 +2710,8 @@ exec_next_inst (
       if ( !op_to_u16 ( intp, &(ops[0]), &op1, err ) ) return RET_ERROR;
       if ( !op_to_u16 ( intp, &(ops[1]), &op2, err ) ) return RET_ERROR;
       if ( !op_to_u16 ( intp, &(ops[2]), &op3, err ) ) return RET_ERROR;
-      if ( !memory_map_WRITEB ( intp->mem, op1 + op2,
+      addr= ((uint32_t) op1) + (uint32_t) ((int32_t) ((int16_t) op2));
+      if ( !memory_map_WRITEB ( intp->mem, addr,
                                 (uint8_t) op3, false, err ) )
         return RET_ERROR;
       break;
