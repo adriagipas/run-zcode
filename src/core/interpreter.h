@@ -38,6 +38,7 @@
 #include "tracer.h"
 
 #include "frontend/conf.h"
+#include "frontend/saves.h"
 #include "frontend/screen.h"
 
 typedef struct
@@ -52,6 +53,8 @@ typedef struct
   Screen       *screen;
   Dictionary   *std_dict;
   Dictionary   *usr_dict;
+  Saves        *saves;
+  gboolean      verbose;
   
   // Altres
   uint8_t version;

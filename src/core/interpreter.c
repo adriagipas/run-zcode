@@ -351,7 +351,7 @@ call_routine (
       if ( !op_to_u16 ( intp, &(ops[i]), &(local_vars[i-1]), err ) )
         return false;
     }
-
+  
   // Crea nou frame
   if ( !state_new_frame ( intp->state, addr, num_local_vars,
                           discard_result, result_var, args_mask, err ) )
@@ -1659,6 +1659,64 @@ sread (
 } // end sread
 
 
+static uint16_t
+save_undo (
+           Interpreter *intp
+           )
+{
+
+  const gchar *undo_fn;
+  char *err;
+
+  
+  err= NULL;
+  undo_fn= saves_get_new_undo_file_name ( intp->saves, &err );
+  if ( undo_fn == NULL ) goto error;
+  if ( intp->verbose )
+    ii ( "Writing undo save file: '%s'", undo_fn );
+  if ( !state_save ( intp->state, undo_fn, &err ) ) goto error;
+  
+  return 1;
+
+ error:
+  ww ( "Failed to save undo: %s", err );
+  g_free ( err );
+  return 0;
+  
+} // end save_undo
+
+
+static uint16_t
+restore_undo (
+              Interpreter *intp
+              )
+{
+
+  const gchar *undo_fn;
+  char *err;
+
+  
+  err= NULL;
+  undo_fn= saves_get_undo_file_name ( intp->saves );
+  if ( undo_fn == NULL )
+    {
+      ww ( "Failed to restore undo: no save file available" );
+      return 0;
+    }
+  if ( intp->verbose )
+    ii ( "Reading undo save file: '%s'", undo_fn );
+  if ( !state_load ( intp->state, undo_fn, &err ) )
+    {
+      ww ( "Failed to restore undo: %s", err );
+      g_free ( err );
+      return 0;
+    }
+    
+  return 2;
+  
+} // end restore_undo
+
+
 static bool
 inst_be (
          Interpreter  *intp,
@@ -1700,6 +1758,25 @@ inst_be (
       if ( places > 0 )       res= op1<<places;
       else if ( places == 0 ) res= op1;
       else                    res= (uint16_t) (((int16_t) op1)>>(-places));
+      if ( !write_var ( intp, result_var, res, err ) ) return false;
+      break;
+
+    case 0x09: // save_undo
+      if ( !read_var_ops_store ( intp, ops, &nops, 0, &result_var, err ) )
+        return false;
+      res= save_undo ( intp );
+      if ( !write_var ( intp, result_var, res, err ) ) return false;
+      break;
+    case 0x0a: // restore_undo
+      if ( !read_var_ops_store ( intp, ops, &nops, 0, &result_var, err ) )
+        return false;
+      res= restore_undo ( intp );
+      if ( res == 2 ) // Exit
+        {
+          if ( !memory_map_READB ( intp->mem, intp->state->PC-1,
+                                   &result_var, true, err ) )
+            return false;
+        }
       if ( !write_var ( intp, result_var, res, err ) ) return false;
       break;
       
@@ -2832,6 +2909,7 @@ interpreter_free (
                   )
 {
 
+  if ( intp->saves != NULL ) saves_free ( intp->saves );
   if ( intp->std_dict != NULL ) dictionary_free ( intp->std_dict );
   if ( intp->usr_dict != NULL ) dictionary_free ( intp->usr_dict );
   g_free ( intp->input_text.v );
@@ -2872,6 +2950,8 @@ interpreter_new_from_file_name (
   ret->input_text.v= NULL;
   ret->std_dict= NULL;
   ret->usr_dict= NULL;
+  ret->saves= NULL;
+  ret->verbose= verbose;
   
   // Obri story file
   ret->sf= story_file_new_from_file_name ( file_name, err );
@@ -2947,9 +3027,13 @@ interpreter_new_from_file_name (
   if ( !dictionary_load ( ret->std_dict, std_dict_addr, err ) ) goto error;
   ret->usr_dict= dictionary_new ( ret->mem, err );
   if ( ret->usr_dict == NULL ) goto error;
+
+  // Saves
+  ret->saves= saves_new ( verbose );
+  if ( ret->saves == NULL ) goto error; // ARA NO PASSA MAI.
   
   return ret;
-
+  
  error:
   interpreter_free ( ret );
   return NULL;

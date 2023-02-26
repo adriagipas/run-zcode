@@ -624,11 +624,13 @@ load_quetzal_stks (
   // Processa
   pos= state->SP= state->frame= 0x0000;
   i= 0;
+  state->frame_ind= 0;
   while ( (pos+3) < 0xFFFF && (i+7) < chunk->length )
     {
       // Old frame
       state->stack[pos++]= state->frame;
       state->frame= state->SP;
+      ++(state->frame_ind);
       // PC_HIGH
       state->stack[pos++]= (((uint16_t) data[i])<<8) | ((uint16_t) data[i+1]);
       i+= 2;
