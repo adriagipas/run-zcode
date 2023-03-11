@@ -30,12 +30,15 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#define SAVES_MAX_UNDO 10
+
 typedef struct
 {
 
   // TOT PRIVAT!!
   gboolean  _verbose;
-  gchar    *_undo_fn;
+  gchar    *_undo_fn[SAVES_MAX_UNDO];
+  int       _N_undo;
   
 } Saves;
 
@@ -49,18 +52,25 @@ saves_new (
            const gboolean verbose
            );
 
-// NULL en cas d'error.
+// NULL en cas d'error. 
 const gchar *
 saves_get_new_undo_file_name (
                               Saves  *s,
                               char  **err
                               );
 
-// Podria torna NULL si no s'ha cridat abans a
-// saves_get_new_undo_file_name
+// Torna l'últim undo fet, però no l'esborra. Podria torna NULL si no
+// s'ha cridat abans a saves_get_new_undo_file_name
 const gchar *
 saves_get_undo_file_name (
                           Saves  *s
                           );
+
+// Elimina l'últim fitxer undo. S'ha de cridar sabent que hi ha un
+// fitxer.
+void
+saves_remove_last_undo_file_name (
+                                  Saves *s
+                                  );
 
 #endif // __FRONTEND__SAVES_H__

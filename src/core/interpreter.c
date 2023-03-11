@@ -1677,7 +1677,7 @@ save_undo (
   if ( !state_save ( intp->state, undo_fn, &err ) ) goto error;
   
   return 1;
-
+  
  error:
   ww ( "Failed to save undo: %s", err );
   g_free ( err );
@@ -1711,7 +1711,8 @@ restore_undo (
       g_free ( err );
       return 0;
     }
-    
+  saves_remove_last_undo_file_name ( intp->saves );
+  
   return 2;
   
 } // end restore_undo

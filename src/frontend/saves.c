@@ -46,20 +46,21 @@
 
 static void
 remove_undo_fn (
-                Saves *s
+                Saves     *s,
+                const int  n
                 )
 {
 
-  assert ( s->_undo_fn != NULL );
+  assert ( s->_undo_fn[n] != NULL );
   
   if ( s->_verbose )
-    ii ( "Removing undo save file: '%s'", s->_undo_fn );
+    ii ( "Removing undo save file: '%s'", s->_undo_fn[n] );
   errno= 0;
-  if ( remove ( s->_undo_fn ) != 0 )
+  if ( remove ( s->_undo_fn[n] ) != 0 )
     ww ( "Failed to remove '%s': %s",
-         s->_undo_fn, errno!=0 ? strerror ( errno ) : "unknown error" );
-  g_free ( s->_undo_fn );
-  s->_undo_fn= NULL;
+         s->_undo_fn[n], errno!=0 ? strerror ( errno ) : "unknown error" );
+  g_free ( s->_undo_fn[n] );
+  s->_undo_fn[n]= NULL;
   
 } // end remove_undo_fn
 
@@ -76,11 +77,15 @@ saves_free (
             )
 {
 
-  if ( s->_undo_fn )
-    {
-      remove_undo_fn ( s );
-      g_free ( s->_undo_fn );
-    }
+  int n;
+
+
+  for ( n= 0; n < SAVES_MAX_UNDO; ++n )
+    if ( s->_undo_fn[n] != NULL )
+      {
+        remove_undo_fn ( s, n );
+        g_free ( s->_undo_fn[n] );
+      }
   g_free ( s );
   
 } // end saves_free
@@ -93,12 +98,15 @@ saves_new (
 {
 
   Saves *ret;
-
+  int n;
+  
   
   // Prepara.
   ret= g_new ( Saves, 1 );
   ret->_verbose= verbose;
-  ret->_undo_fn= NULL;
+  ret->_N_undo= 0;
+  for ( n= 0; n < SAVES_MAX_UNDO; ++n )
+    ret->_undo_fn[n]= NULL;
   
   return ret;
   
@@ -117,6 +125,14 @@ saves_get_new_undo_file_name (
   gchar *time_str;
   
 
+  // Comprova queda espai.
+  if ( s->_N_undo == SAVES_MAX_UNDO )
+    {
+      msgerror ( err,
+                 "max number of undo files reached" );
+      return NULL;
+    }
+  
   // Prepara.
   buffer= NULL;
   dt= NULL;
@@ -134,18 +150,18 @@ saves_get_new_undo_file_name (
     }
   time_str= g_date_time_format_iso8601 ( dt );
   g_date_time_unref ( dt ); dt= NULL;
-  g_string_printf ( buffer, "%s/run_zcode-undo-%d-%s.sav",
+  g_string_printf ( buffer, "%s/run_zcode-undo-%d-%s.sav%d",
                     g_get_tmp_dir (),
                     getpid (),
-                    time_str );
+                    time_str,
+                    s->_N_undo );
   g_free ( time_str ); time_str= NULL;
 
   // Torna el nom del fitxer.
-  if ( s->_undo_fn != NULL ) remove_undo_fn ( s );
-  s->_undo_fn= buffer->str;
+  s->_undo_fn[s->_N_undo++]= buffer->str;
   g_string_free ( buffer, FALSE );
-
-  return s->_undo_fn;
+  
+  return s->_undo_fn[s->_N_undo-1];
   
  error:
   if ( buffer != NULL ) g_string_free ( buffer, TRUE );
@@ -161,5 +177,22 @@ saves_get_undo_file_name (
                           Saves  *s
                           )
 {
-  return s->_undo_fn;
+
+  if ( s->_N_undo == 0 )
+    return NULL;
+  else
+    return s->_undo_fn[s->_N_undo-1];
+  
 } // end saves_get_undo_file_name
+
+
+void
+saves_remove_last_undo_file_name (
+                                  Saves *s
+                                  )
+{
+
+  if ( s->_N_undo > 0 )
+    remove_undo_fn ( s, --s->_N_undo );
+  
+} // end saves_remove_undo_file_name
