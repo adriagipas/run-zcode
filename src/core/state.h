@@ -83,7 +83,7 @@ struct _State
   
   // Callbacks.
   bool (*writevar) (State *,const uint8_t,const uint16_t,char **);
-  bool (*readvar) (State *,const uint8_t,uint16_t *,char **);
+  bool (*readvar) (State *,const uint8_t,uint16_t *,const bool,char **);
   
 };
 
@@ -137,8 +137,8 @@ state_free_frame (
   ((STATE)->writevar ( (STATE), (VAR), (VAL), (ERR) ))
 
 // VAR: 0 pila, resta variables locals.
-#define state_readvar(STATE,VAR,P_DST,ERR)              \
-  ((STATE)->readvar ( (STATE), (VAR), (P_DST), (ERR) ))
+#define state_readvar(STATE,VAR,P_DST,POP,ERR)          \
+  ((STATE)->readvar ( (STATE), (VAR), (P_DST), (POP), (ERR) ))
 
 void
 state_print_stack (

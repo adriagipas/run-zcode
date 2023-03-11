@@ -745,6 +745,7 @@ readvar (
          State          *state,
          const uint8_t   var,
          uint16_t       *val,
+         const bool      pop,
          char          **err
          )
 {
@@ -760,7 +761,10 @@ readvar (
           msgerror ( err, "Stack underflow" );
           return false;
         }
-      *val= state->stack[--state->SP];
+      if ( pop )
+        *val= state->stack[--state->SP];
+      else
+        *val= state->stack[state->SP-1];
     }
 
   // Variable local
@@ -786,11 +790,12 @@ readvar_trace (
                State          *state,
                const uint8_t   var,
                uint16_t       *val,
+               const bool      pop,
                char          **err
                )
 {
 
-  if ( !readvar ( state, var, val, err ) )
+  if ( !readvar ( state, var, val, pop, err ) )
     return false;
   if ( state->tracer != NULL && state->tracer->stack_access != NULL )
     state->tracer->stack_access ( state->tracer, var, *val, STACK_ACCESS_READ );

@@ -87,6 +87,7 @@ get_inst_name (
     case INSTRUCTION_NAME_JL              : return "jl              ";
     case INSTRUCTION_NAME_JUMP            : return "jump            ";
     case INSTRUCTION_NAME_JZ              : return "jz              ";
+    case INSTRUCTION_NAME_LOAD            : return "load            ";
     case INSTRUCTION_NAME_LOADB           : return "loadb           ";
     case INSTRUCTION_NAME_LOADW           : return "loadw           ";
     case INSTRUCTION_NAME_LOG_SHIFT       : return "log_shift       ";

@@ -268,22 +268,25 @@ op_to_ref (
     }
   if ( ins->ops[op].type == INSTRUCTION_OP_TYPE_SMALL_CONSTANT )
       set_variable_type ( &(ins->ops[op]) );
-  switch ( ins->ops[op].type )
+  else
     {
-    case INSTRUCTION_OP_TYPE_TOP_STACK:
-      ins->ops[op].type= INSTRUCTION_OP_TYPE_REF_TOP_STACK;
-      break;
-    case INSTRUCTION_OP_TYPE_LOCAL_VARIABLE:
-      ins->ops[op].type= INSTRUCTION_OP_TYPE_REF_LOCAL_VARIABLE;
-      break;
-    case INSTRUCTION_OP_TYPE_GLOBAL_VARIABLE:
-      ins->ops[op].type= INSTRUCTION_OP_TYPE_REF_GLOBAL_VARIABLE;
-      break;
-    default:
-      msgerror ( err,
-                 "Failed to disassemble instruction: operand %d is not a"
-                 " valid reference to variable", op+1 );
-      return false;
+      switch ( ins->ops[op].type )
+        {
+        case INSTRUCTION_OP_TYPE_TOP_STACK:
+          ins->ops[op].type= INSTRUCTION_OP_TYPE_REF_TOP_STACK;
+          break;
+        case INSTRUCTION_OP_TYPE_LOCAL_VARIABLE:
+          ins->ops[op].type= INSTRUCTION_OP_TYPE_REF_LOCAL_VARIABLE;
+          break;
+        case INSTRUCTION_OP_TYPE_GLOBAL_VARIABLE:
+          ins->ops[op].type= INSTRUCTION_OP_TYPE_REF_GLOBAL_VARIABLE;
+          break;
+        default:
+          msgerror ( err,
+                     "Failed to disassemble instruction: operand %d is not a"
+                     " valid reference to variable", op+1 );
+          return false;
+        }
     }
   
   return true;
@@ -627,10 +630,12 @@ decode_next_inst (
     case 0x04: // dec_chk
       if ( !ins_2op_branch ( ins, mem, &addr, INSTRUCTION_NAME_DEC_CHK, err ) )
         return false;
+      if ( !op_to_ref ( ins, 0, err ) ) return false;
       break;
     case 0x05: // inc_chk
       if ( !ins_2op_branch ( ins, mem, &addr, INSTRUCTION_NAME_INC_CHK, err ) )
         return false;
+      if ( !op_to_ref ( ins, 0, err ) ) return false;
       break;
     case 0x06: // jin
       if ( !ins_2op_branch ( ins, mem, &addr, INSTRUCTION_NAME_JIN, err ) )
@@ -711,10 +716,12 @@ decode_next_inst (
     case 0x24: // dec_chk
       if ( !ins_2op_branch ( ins, mem, &addr, INSTRUCTION_NAME_DEC_CHK, err ) )
         return false;
+      if ( !op_to_ref ( ins, 0, err ) ) return false;
       break;
     case 0x25: // inc_chk
       if ( !ins_2op_branch ( ins, mem, &addr, INSTRUCTION_NAME_INC_CHK, err ) )
         return false;
+      if ( !op_to_ref ( ins, 0, err ) ) return false;
       break;
     case 0x26: // jin
       if ( !ins_2op_branch ( ins, mem, &addr, INSTRUCTION_NAME_JIN, err ) )
@@ -795,10 +802,12 @@ decode_next_inst (
     case 0x44: // dec_chk
       if ( !ins_2op_branch ( ins, mem, &addr, INSTRUCTION_NAME_DEC_CHK, err ) )
         return false;
+      if ( !op_to_ref ( ins, 0, err ) ) return false;
       break;
     case 0x45: // inc_chk
       if ( !ins_2op_branch ( ins, mem, &addr, INSTRUCTION_NAME_INC_CHK, err ) )
         return false;
+      if ( !op_to_ref ( ins, 0, err ) ) return false;
       break;
     case 0x46: // jin
       if ( !ins_2op_branch ( ins, mem, &addr, INSTRUCTION_NAME_JIN, err ) )
@@ -879,10 +888,12 @@ decode_next_inst (
     case 0x64: // dec_chk
       if ( !ins_2op_branch ( ins, mem, &addr, INSTRUCTION_NAME_DEC_CHK, err ) )
         return false;
+      if ( !op_to_ref ( ins, 0, err ) ) return false;
       break;
     case 0x65: // inc_chk
       if ( !ins_2op_branch ( ins, mem, &addr, INSTRUCTION_NAME_INC_CHK, err ) )
         return false;
+      if ( !op_to_ref ( ins, 0, err ) ) return false;
       break;
     case 0x66: // jin
       if ( !ins_2op_branch ( ins, mem, &addr, INSTRUCTION_NAME_JIN, err ) )
@@ -992,7 +1003,11 @@ decode_next_inst (
       if ( !ins_1op ( ins, mem, &addr, INSTRUCTION_NAME_PRINT_PADDR, err ) )
         return false;
       break;
-
+    case 0x8e: // load
+      if ( !ins_1op_store ( ins, mem, &addr, INSTRUCTION_NAME_LOAD, err ) )
+        return false;
+      if ( !op_to_ref ( ins, 0, err ) ) return false;
+      break;
     case 0x8f: // call_1n
       if ( mem->sf_mem[0] >= 5 )
         {
@@ -1048,7 +1063,11 @@ decode_next_inst (
       if ( !ins_1op ( ins, mem, &addr, INSTRUCTION_NAME_PRINT_PADDR, err ) )
         return false;
       break;
-
+    case 0x9e: // load
+      if ( !ins_1op_store ( ins, mem, &addr, INSTRUCTION_NAME_LOAD, err ) )
+        return false;
+      if ( !op_to_ref ( ins, 0, err ) ) return false;
+      break;
     case 0x9f: // call_1n
       if ( mem->sf_mem[0] >= 5 )
         {
@@ -1104,7 +1123,11 @@ decode_next_inst (
       if ( !ins_1op ( ins, mem, &addr, INSTRUCTION_NAME_PRINT_PADDR, err ) )
         return false;
       break;
-      
+    case 0xae: // load
+      if ( !ins_1op_store ( ins, mem, &addr, INSTRUCTION_NAME_LOAD, err ) )
+        return false;
+      if ( !op_to_ref ( ins, 0, err ) ) return false;
+      break;
     case 0xaf: // call_1n
       if ( mem->sf_mem[0] >= 5 )
         {

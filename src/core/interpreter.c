@@ -167,12 +167,13 @@ unpack_addr (
 
 
 static bool
-read_var (
-          Interpreter    *intp,
-          const uint8_t   var,
-          uint16_t       *val,
-          char          **err
-          )
+read_var_base (
+               Interpreter    *intp,
+               const uint8_t   var,
+               uint16_t       *val,
+               const bool      pop,
+               char          **err
+               )
 {
 
   State *state;
@@ -181,7 +182,7 @@ read_var (
   state= intp->state;
   if ( var <= 0x0f ) // Pila o variables locals
     {
-      if ( !state_readvar ( state, var, val, err ) )
+      if ( !state_readvar ( state, var, val, pop, err ) )
         return false;
     }
   else // Variables globals
@@ -189,7 +190,58 @@ read_var (
   
   return true;
   
+} // end read_var_base
+
+
+static bool
+read_var (
+          Interpreter    *intp,
+          const uint8_t   var,
+          uint16_t       *val,
+          char          **err
+          )
+{
+  return read_var_base ( intp, var, val, true, err );
 } // end read_var
+
+
+static bool
+read_var_nopop (
+                Interpreter    *intp,
+                const uint8_t   var,
+                uint16_t       *val,
+                char          **err
+                )
+{
+  return read_var_base ( intp, var, val, false, err );
+} // end read_var_nopop
+
+
+static bool
+read_ind_var_ref (
+                  Interpreter    *intp,
+                  const uint8_t   var,
+                  uint8_t        *ref,
+                  char          **err
+                  )
+{
+
+  uint16_t tmp;
+
+  
+  if ( !read_var_base ( intp, var, &tmp, true, err ) )
+    return false;
+  if ( tmp >= 256 )
+    {
+      msgerror ( err, "Failed to read indirect variable, reference"
+                 " is too large (%u)", tmp );
+      return false;
+    }
+  *ref= (uint8_t) tmp;
+  
+  return true;
+  
+} // end read_ind_var_ref
 
 
 static bool
@@ -262,11 +314,9 @@ op_to_refvar (
       *ref= op->u8.val;
       break;
     case OP_VARIABLE:
-      // NOTA!! Açò és possible??????????
-      msgerror ( err, "Trying to reference a variable with a variable" );
-      return false;
-      //*ref= op->u8.val;
-      //break;
+      if ( !read_ind_var_ref ( intp, op->u8.val, ref, err ) )
+        return false;
+      break;
     default:
       ee ( "interpreter.c - op_to_u16 - WTF!!" );
     }
@@ -1800,7 +1850,7 @@ exec_next_inst (
 {
 
   int nops,n;
-  uint8_t opcode,result_var,op1_u8,op2_u8,res_u8;
+  uint8_t opcode,result_var,op1_u8,op2_u8,res_u8,ref;
   uint16_t op1,op2,op3,res,tmp16;
   uint32_t addr;
   State *state;
@@ -2129,14 +2179,24 @@ exec_next_inst (
         return RET_ERROR;
       break;
     case 0x44: // dec_chk
-      msgerror ( err, "Failed to execute @dec_chnk: Trying to reference"
-                 " a variable with a variable" );
-      return RET_ERROR;
+      if ( !read_small_small ( intp, &op1_u8, &op2_u8, err )) return RET_ERROR;
+      SET_U8TOU16(op2_u8,op2);
+      if ( !read_ind_var_ref ( intp, op1_u8, &ref, err ) ) return RET_ERROR;
+      if ( !read_var ( intp, ref, &op1, err ) ) return RET_ERROR;
+      --op1;
+      if ( !write_var ( intp, ref, op1, err ) ) return RET_ERROR;
+      if ( !branch ( intp, (int16_t) op1 < (int16_t) op2, err ) )
+        return RET_ERROR;
       break;
     case 0x45: // inc_chk
-      msgerror ( err, "Failed to execute @inc_chnk: Trying to reference"
-                 " a variable with a variable" );
-      return RET_ERROR;
+      if ( !read_small_small ( intp, &op1_u8, &op2_u8, err )) return RET_ERROR;
+      SET_U8TOU16(op2_u8,op2);
+      if ( !read_ind_var_ref ( intp, op1_u8, &ref, err ) ) return RET_ERROR;
+      if ( !read_var ( intp, ref, &op1, err ) ) return RET_ERROR;
+      ++op1;
+      if ( !write_var ( intp, ref, op1, err ) ) return RET_ERROR;
+      if ( !branch ( intp, (int16_t) op1 > (int16_t) op2, err ) )
+        return RET_ERROR;
       break;
     case 0x46: // jin
       if ( !read_var_small ( intp, &op1, &op2_u8, err ) ) return RET_ERROR;
@@ -2168,9 +2228,10 @@ exec_next_inst (
     case 0x4d: // store
       if ( !read_small_small ( intp, &op1_u8, &op2_u8, err ) ) return RET_ERROR;
       SET_U8TOU16(op2_u8,op2);
-      if ( op1_u8 == 0x00 ) // Si es desa en la pila descarte anterior
+      if ( !read_ind_var_ref ( intp, op1_u8, &ref, err ) ) return RET_ERROR;
+      if ( ref == 0x00 ) // Si es desa en la pila descarte anterior
         { if ( !read_var ( intp, 0, &tmp16, err ) ) return RET_ERROR; }
-      if ( !write_var ( intp, op1_u8, op2, err ) ) return RET_ERROR;
+      if ( !write_var ( intp, ref, op2, err ) ) return RET_ERROR;
       break;
 
     case 0x4f: // loadw
@@ -2293,10 +2354,12 @@ exec_next_inst (
       break;
       
     case 0x6d: // store
-      if ( !read_small_var ( intp, &op1_u8, &op2, err ) ) return RET_ERROR;
-      if ( op1_u8 == 0x00 ) // Si es desa en la pila descarte anterior
+      if ( !read_small_small ( intp, &op1_u8, &op2_u8, err ) ) return RET_ERROR;
+      if ( !read_ind_var_ref ( intp, op1_u8, &ref, err ) ) return RET_ERROR;
+      if ( !read_var ( intp, op2_u8, &op2, err ) ) return RET_ERROR;
+      if ( ref == 0x00 ) // Si es desa en la pila descarte anterior
         { if ( !read_var ( intp, 0, &tmp16, err ) ) return RET_ERROR; }
-      if ( !write_var ( intp, op1_u8, op2, err ) ) return RET_ERROR;
+      if ( !write_var ( intp, ref, op2, err ) ) return RET_ERROR;
       break;
 
     case 0x6f: // loadw
@@ -2418,7 +2481,11 @@ exec_next_inst (
       state->PC+= 2;
       if ( !print_paddr ( intp, op1, err ) ) return RET_ERROR;
       break;
-
+    case 0x8e: // load
+      msgerror ( err, "Failed to execute @load: Trying to reference"
+                 " a variable with a large constant" );
+      return RET_ERROR;
+      break;
     case 0x8f: // call_1n / not
       if ( intp->version >= 5 )
         {
@@ -2497,7 +2564,12 @@ exec_next_inst (
       SET_U8TOU16(op1_u8,op1);
       if ( !print_paddr ( intp, op1, err ) ) return RET_ERROR;
       break;
-      
+    case 0x9e: // load
+      if ( !read_op1_small_store ( intp, &op1_u8, &result_var, err ) )
+        return RET_ERROR;
+      if ( !read_var_nopop ( intp, op1_u8, &res, err ) ) return RET_ERROR;
+      if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
+      break;
     case 0x9f: // call_1n / not
       if ( intp->version >= 5 )
         {
@@ -2528,14 +2600,20 @@ exec_next_inst (
       if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
       break;
     case 0xa5: // inc. NOTA!! Açò és possible?
-      msgerror ( err, "Failed to execute @inc: Trying to reference"
-                 " a variable with a variable" );
-      return RET_ERROR;
+      if ( !memory_map_READB ( intp->mem, state->PC++, &op1_u8, true, err ) )
+        return RET_ERROR;
+      if ( !read_ind_var_ref ( intp, op1_u8, &ref, err ) ) return RET_ERROR;
+      if ( !read_var ( intp, ref, &op1, err ) ) return RET_ERROR;
+      ++op1;
+      if ( !write_var ( intp, ref, op1, err ) ) return RET_ERROR;
       break;
     case 0xa6: // dec. NOTA!! Açò és possible?
-      msgerror ( err, "Failed to execute @dec: Trying to reference"
-                 " a variable with a variable" );
-      return RET_ERROR;
+      if ( !memory_map_READB ( intp->mem, state->PC++, &op1_u8, true, err ) )
+        return RET_ERROR;
+      if ( !read_ind_var_ref ( intp, op1_u8, &ref, err ) ) return RET_ERROR;
+      if ( !read_var ( intp, ref, &op1, err ) ) return RET_ERROR;
+      --op1;
+      if ( !write_var ( intp, ref, op1, err ) ) return RET_ERROR;
       break;
     case 0xa7: // print_addr
       if ( !read_op1_var ( intp, &op1, err ) ) return RET_ERROR;
@@ -2562,7 +2640,13 @@ exec_next_inst (
       if ( !read_op1_var ( intp, &op1, err ) ) return RET_ERROR;
       if ( !print_paddr ( intp, op1, err ) ) return RET_ERROR;
       break;
-      
+    case 0xae: // load. NOTA!! Açò és possible?
+      if ( !read_op1_small_store ( intp, &op1_u8, &result_var, err ) )
+        return RET_ERROR;
+      if ( !read_ind_var_ref ( intp, op1_u8, &ref, err ) ) return RET_ERROR;
+      if ( !read_var_nopop ( intp, ref, &res, err ) ) return RET_ERROR;
+      if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
+      break;
     case 0xaf: // call_1n / not
       if ( intp->version >= 5 )
         {
@@ -2595,7 +2679,8 @@ exec_next_inst (
       break;
       
     case 0xb8: // ret_popped
-      if ( !state_readvar ( intp->state, 0, &op1, err ) ) return RET_ERROR;
+      if ( !state_readvar ( intp->state, 0, &op1, true, err ) )
+        return RET_ERROR;
       if ( !ret_val ( intp, op1, err ) ) return RET_ERROR;
       break;
 
