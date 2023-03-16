@@ -158,8 +158,9 @@ find_token (
   
   assert ( d->_token.N > 0 );
 
-  // Si és massa llarg ix. (CAL TRUNCAR????)
-  if ( d->_token.N > d->_real_text_length ) { *addr= 0; return true; }
+  // Si és massa llarg trunca.
+  if ( d->_token.N > d->_real_text_length )
+    d->_token.N= d->_real_text_length;
   
   // Codifica.
   // NOTA!!! En realitat en aquest punt sols trobarem minúscules.
@@ -220,8 +221,8 @@ find_token (
         }
     }
 
-  // Torna a comprovar.
-  if ( N > d->_real_text_length ) { *addr= 0; return true; }
+  // Torna a comprovar i a truncar.
+  if ( N > d->_real_text_length ) N= d->_real_text_length;
 
   // Comprimeix.
   // --> Afegeix padding
