@@ -57,6 +57,7 @@
 #define S32_U16(S32) ((uint16_t) ((uint32_t) (S32)))
 
 // ESPECIAL ZSCII CHARS
+#define ZSCII_TAB     11
 #define ZSCII_NEWLINE 13
 #define ZSCII_DELETE  8
 
@@ -1432,6 +1433,102 @@ zscii2utf8 (
 
 
 static bool
+print_output3 (
+               Interpreter  *intp,
+               const char   *text,
+               char        **err
+               )
+{
+
+  const char *p;
+  uint8_t zc,val;
+  uint32_t addr;
+  int o_ind;
+  
+
+  o_ind= intp->ostreams.N3-1;
+  for ( p= text; *p != '\0'; ++p )
+    {
+
+      // Conversió UTF-8 -> ZSCII
+      val= (uint8_t) *p;
+      // --> Primers caràcters
+      if ( val < 32 )
+        {
+          if ( *p == '\n' ) zc= ZSCII_NEWLINE;
+          else if ( *p == '\t' && intp->version == 6 ) zc= ZSCII_TAB;
+          // desconegut en ZSCII
+          else zc= '?';
+        }
+      // --> ASCII
+      else if ( val < 127 ) zc= (uint8_t) *p;
+      // --> DELETE
+      else if ( val == 127 ) zc= '?';
+      // --> Resta caràcters
+      else
+        {
+          ee ("print_output - CAL IMPLEMENTAR EXTRA CHARS");
+        }
+
+      // Escriu
+      addr=
+        intp->ostreams.o3[o_ind].addr +
+        2 +
+        (uint32_t) intp->ostreams.o3[o_ind].N
+        ;
+      if ( !memory_map_WRITEB ( intp->mem, addr, zc, true, err ) )
+        return false;
+      ++(intp->ostreams.o3[o_ind].N);
+      
+    }
+  
+  return true;
+  
+} // end print_output3
+
+
+static bool
+print_output (
+              Interpreter  *intp,
+              const char   *text,
+              const bool    is_input,
+              char        **err
+              )
+{
+
+  // Screen
+  if ( (intp->ostreams.active&INTP_OSTREAM_SCREEN)!=0 &&
+       (intp->ostreams.active&INTP_OSTREAM_TABLE)==0 )
+    {
+      if ( !screen_print ( intp->screen, text, err ) )
+        return false;
+    }
+
+  // Transcript
+  if ( (intp->ostreams.active&INTP_OSTREAM_TRANSCRIPT)!=0 )
+    {
+      ee ( "print_output - CAL IMPLEMENTAR output stream 2 (transcript)" );
+    }
+
+  // Table
+  if ( (intp->ostreams.active&INTP_OSTREAM_TABLE)!=0 )
+    {
+      if ( !print_output3 ( intp, text, err ) )
+        return false;
+    }
+  
+  // Script
+  if ( (intp->ostreams.active&INTP_OSTREAM_SCRIPT)!=0 )
+    {
+      ee ( "print_output - CAL IMPLEMENTAR output stream 4 (script)" );
+    }
+  
+  return true;
+  
+} // end print_output
+
+
+static bool
 print_addr (
             Interpreter     *intp,
             const uint32_t   addr,
@@ -1443,7 +1540,7 @@ print_addr (
 
   if ( !zscii2utf8 ( intp, addr, ret_addr, hmem_allowed, false, err ) )
     return false;
-  if ( !screen_print ( intp->screen, intp->text.v, err ) )
+  if ( !print_output ( intp, intp->text.v, false, err ) )
     return false;
   
   return true;
@@ -1496,7 +1593,7 @@ print_num (
       msgerror ( err, "Failed to print number: %d", num );
       return false;
     }
-  if ( !screen_print ( intp->screen, intp->text.v, err ) )
+  if ( !print_output ( intp, intp->text.v, false, err ) )
     return false;
   
   return true;
@@ -1520,7 +1617,7 @@ print_char (
   if ( !text_add ( intp, '\0', err ) ) return false;
   
   // Imprimeix
-  if ( !screen_print ( intp->screen, intp->text.v, err ) ) return false;
+  if ( !print_output ( intp, intp->text.v, false, err ) ) return false;
   
   return true;
   
@@ -1559,7 +1656,7 @@ print_input_text (
   if ( !text_add ( intp, '\0', err ) ) return false;
   
   // Imprimeix
-  if ( !screen_print ( intp->screen, intp->text.v, err ) )
+  if ( !print_output ( intp, intp->text.v, true, err ) )
     return false;
   
   return true;
@@ -1672,7 +1769,7 @@ sread (
     
   } while ( !stop );
   // --> Pinta retorn carro.
-  if ( !screen_print ( intp->screen, "\n", err ) )
+  if ( !print_output ( intp, "\n", true, err ) )
     return false;
   
   // Escriu en el text buffer
@@ -1766,6 +1863,81 @@ restore_undo (
   return 2;
   
 } // end restore_undo
+
+
+static bool
+output_stream (
+               Interpreter      *intp,
+               const operand_t  *ops,
+               const int         nops,
+               char            **err
+               )
+{
+
+  uint16_t tmp;
+  int16_t number;
+  bool select;
+  
+  
+  // Obté primer operand
+  if ( nops == 0 )
+    {
+      msgerror ( err,
+                 "Failed to execute output_stream: missing number argument" );
+      return false;
+    }
+  if ( !op_to_u16 ( intp, &(ops[0]), &tmp, err ) ) return false;
+  number= (int16_t) tmp;
+  if ( number == 0 ) return true; // No fa res
+
+  // Comprovació operadors i select
+  if ( (number != 3 && nops != 1) ||
+       (number == 3 && (nops < 2 || nops > 3)) )
+    goto wrong_args;
+  if ( nops == 3 && intp->version != 6 ) goto wrong_args;
+  if ( number > 0 ) { select= true; }
+  else              { select= false; number= -number; }
+
+  // Accions especial output stream 3
+  if ( number == 3 )
+    {
+      if ( select )
+        {
+          if ( intp->ostreams.N3 == INTP_MAX_OSTREAM3 )
+            {
+              msgerror ( err,
+                         "Failed to execute output_stream 3: reached"
+                         " maximum number of active output stream 3" );
+              return false;
+            }
+          if ( !op_to_u16 ( intp, &(ops[1]), &tmp, err ) ) return false;
+          intp->ostreams.o3[intp->ostreams.N3].addr= (uint32_t) tmp;
+          intp->ostreams.o3[intp->ostreams.N3++].N= 0;
+        }
+      // Ignora si no hi ha un stream seleccionat prèviament.
+      else if ( intp->ostreams.N3 > 0 )
+        {
+          --intp->ostreams.N3;
+          if ( !memory_map_WRITEW ( intp->mem,
+                                    intp->ostreams.o3[intp->ostreams.N3].addr,
+                                    intp->ostreams.o3[intp->ostreams.N3].N,
+                                    true, err ) )
+            return false;
+        }
+    }
+
+  // Selecciona/Deselecciona
+  if ( select ) intp->ostreams.active|= 0x1<<(number-1);
+  else          intp->ostreams.active&= ~(0x1<<(number-1));
+  
+  return true;
+  
+ wrong_args:
+  msgerror ( err,
+             "Failed to execute output_stream: wrong number of arguments" );
+  return false;
+  
+} // end output_stream
 
 
 static bool
@@ -2674,7 +2846,7 @@ exec_next_inst (
       break;
     case 0xb3: // print_ret
       if ( !print ( intp, err ) ) return RET_ERROR;
-      if ( !screen_print ( intp->screen, "\n", err ) ) return RET_ERROR;
+      if ( !print_output ( intp, "\n", false, err ) ) return RET_ERROR;
       if ( !ret_val ( intp, 1, err ) ) return RET_ERROR;
       break;
       
@@ -2688,7 +2860,7 @@ exec_next_inst (
       return RET_STOP;
       break;
     case 0xbb: // new_line
-      if ( !screen_print ( intp->screen, "\n", err ) ) return RET_ERROR;
+      if ( !print_output ( intp, "\n", false, err ) ) return RET_ERROR;
       break;
 
     case 0xbe: // extended
@@ -2942,6 +3114,12 @@ exec_next_inst (
       screen_set_style ( intp->screen, op1 );
       break;
 
+    case 0xf3: // output_stream
+      if ( intp->version < 3 ) goto wrong_version;
+      if ( !read_var_ops ( intp, ops, &nops, -1, err ) ) return RET_ERROR;
+      if ( !output_stream ( intp, ops, nops, err ) ) return RET_ERROR;
+      break;
+      
     case 0xf8: // not
       if ( intp->version < 5 ) goto wrong_version;
       if ( !read_var_ops_store ( intp, ops, &nops, 1, &result_var, err ) )
@@ -3117,6 +3295,10 @@ interpreter_new_from_file_name (
   // Saves
   ret->saves= saves_new ( verbose );
   if ( ret->saves == NULL ) goto error; // ARA NO PASSA MAI.
+
+  // Output streams
+  ret->ostreams.active= INTP_OSTREAM_SCREEN;
+  ret->ostreams.N3= 0;
   
   return ret;
   

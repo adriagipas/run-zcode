@@ -96,6 +96,7 @@ get_inst_name (
     case INSTRUCTION_NAME_NEW_LINE        : return "new_line        ";
     case INSTRUCTION_NAME_NOT             : return "not             ";
     case INSTRUCTION_NAME_OR              : return "or              ";
+    case INSTRUCTION_NAME_OUTPUT_STREAM   : return "output_stream   ";
     case INSTRUCTION_NAME_PRINT           : return "print           ";
     case INSTRUCTION_NAME_PRINT_ADDR      : return "print_addr      ";
     case INSTRUCTION_NAME_PRINT_CHAR      : return "print_char      ";

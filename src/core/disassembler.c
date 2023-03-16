@@ -1309,7 +1309,15 @@ decode_next_inst (
             return false;
         }
       break;
-
+      
+    case 0xf3: // output_stream
+      if ( mem->sf_mem[0] >= 3 )
+        {
+          if ( !read_var_ops ( ins, mem, &addr, err ) ) return false;
+          ins->name= INSTRUCTION_NAME_OUTPUT_STREAM;
+        }
+      break;
+      
     case 0xf8: // not
       if ( !read_var_ops_store ( ins, mem, &addr, err ) ) return false;
       if ( !ins_var_1op ( ins, INSTRUCTION_NAME_NOT, err ) ) return false;

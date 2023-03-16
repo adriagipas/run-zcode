@@ -41,6 +41,13 @@
 #include "frontend/saves.h"
 #include "frontend/screen.h"
 
+#define INTP_MAX_OSTREAM3 16
+
+#define INTP_OSTREAM_SCREEN     0x01
+#define INTP_OSTREAM_TRANSCRIPT 0x02
+#define INTP_OSTREAM_TABLE      0x04
+#define INTP_OSTREAM_SCRIPT     0x08
+
 typedef struct
 {
 
@@ -75,6 +82,18 @@ typedef struct
     size_t   N;
     uint8_t *v;  // ZSCII
   }        input_text;
+
+  // Output streams
+  struct
+  {
+    uint8_t active; // Mascara de bits
+    int     N3;     // Nombre de streams 3 niats
+    struct
+    {
+      uint32_t addr;
+      uint16_t N;
+    }       o3[INTP_MAX_OSTREAM3];
+  } ostreams;
   
 } Interpreter;
 
