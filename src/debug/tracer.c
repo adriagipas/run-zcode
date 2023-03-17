@@ -118,7 +118,9 @@ get_inst_name (
     case INSTRUCTION_NAME_RTRUE           : return "rtrue           ";
     case INSTRUCTION_NAME_SAVE_UNDO       : return "save_undo       ";
     case INSTRUCTION_NAME_SCAN_TABLE      : return "scan_table      ";
+    case INSTRUCTION_NAME_SET_COLOUR      : return "set_colour      ";
     case INSTRUCTION_NAME_SET_TEXT_STYLE  : return "set_text_style  ";
+    case INSTRUCTION_NAME_SET_TRUE_COLOUR : return "set_true_colour ";
     case INSTRUCTION_NAME_STORE           : return "store           ";
     case INSTRUCTION_NAME_STOREB          : return "storeb          ";
     case INSTRUCTION_NAME_STOREW          : return "storew          ";

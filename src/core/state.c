@@ -156,6 +156,11 @@ reset_header_values (
       state->mem[0x2c]= 9; // white
       state->mem[0x2d]= 2; // black
     }
+
+  // 0x32: Standard revision number (major)
+  // 0x33: Standard revision number (minor)
+  state->mem[0x32]= 1;
+  state->mem[0x33]= 1;
   
 } // end reset_header_values
 

@@ -560,6 +560,31 @@ text_input2zscii (
 } // end text_input2zscii
 
 
+static void
+set_colour (
+            Screen         *screen,
+            const uint16_t  colour,
+            uint16_t       *dst,
+            const uint16_t  default_colour
+            )
+{
+
+  // Pixel under the cursor
+  if ( colour == 0xFFFD && screen->_version == 6 )
+    ww ( "True colour -3 for V6 not supported" );
+  // Transparent
+  else if ( colour == 0xFFFC && screen->_version == 6 )
+    ww ( "True colour -4 for V6 not supported" );
+  // Default
+  else if ( colour == 0xFFFF ) *dst= default_colour;
+  // Regular
+  else if ( (colour&0x8000) == 0 ) *dst= colour;
+  // Unknown
+  else if ( colour != 0xFFFE ) // Current
+    ww ( "Unsupported true colour %X", colour );
+  
+} // end set_colour
+
 
 
 
@@ -815,6 +840,20 @@ screen_set_style (
     }
   
 } // end screen_set_style
+
+
+void
+screen_set_colour (
+                   Screen         *screen,
+                   const uint16_t  fg,
+                   const uint16_t  bg
+                   )
+{
+  
+  set_colour ( screen, fg, &screen->_fg_color, C_BLACK );
+  set_colour ( screen, bg, &screen->_bg_color, C_WHITE );
+  
+} // end screen_set_colour
 
 
 bool

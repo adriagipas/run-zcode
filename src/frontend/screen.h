@@ -151,6 +151,14 @@ screen_set_style (
                   const uint16_t  style
                   );
 
+// True colour (Els valors negatius són especials).
+void
+screen_set_colour (
+                   Screen         *screen,
+                   const uint16_t  fg,
+                   const uint16_t  bg
+                   );
+
 // Intenta llegir caràcters en format ZSCII. Típicament llig un
 // caràcter cada vegada, però pot llegir de colp fins a
 // SCREEN_INPUT_TEXT_BUF. En 'N' desa el nombre de caràcters llegits.

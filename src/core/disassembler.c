@@ -646,6 +646,11 @@ inst_be (
       ins->name= INSTRUCTION_NAME_RESTORE_UNDO;
       break;
       
+    case 0x0d: // set_true_colour
+      if ( !read_var_ops ( ins, mem, addr, false, err ) ) return false;
+      ins->name= INSTRUCTION_NAME_SET_TRUE_COLOUR;
+      break;
+      
     default: // Descodifica com UNK
       break;
     }
@@ -762,6 +767,13 @@ decode_next_inst (
         return false;
       break;
 
+    case 0x1b: // set_colour
+      if ( mem->sf_mem[0] >= 5 )
+        {
+          if ( !ins_2op ( ins, mem, &addr, INSTRUCTION_NAME_SET_COLOUR, err ) )
+            return false;
+        }
+      break;
     case 0x1c: // throw
       if ( mem->sf_mem[0] >= 5 )
         {
@@ -856,6 +868,13 @@ decode_next_inst (
         return false;
       break;
 
+    case 0x3b: // set_colour
+      if ( mem->sf_mem[0] >= 5 )
+        {
+          if ( !ins_2op ( ins, mem, &addr, INSTRUCTION_NAME_SET_COLOUR, err ) )
+            return false;
+        }
+      break;
     case 0x3c: // throw
       if ( mem->sf_mem[0] >= 5 )
         {
@@ -949,7 +968,14 @@ decode_next_inst (
       if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_MOD, err ) )
         return false;
       break;
-      
+
+    case 0x5b: // set_colour
+      if ( mem->sf_mem[0] >= 5 )
+        {
+          if ( !ins_2op ( ins, mem, &addr, INSTRUCTION_NAME_SET_COLOUR, err ) )
+            return false;
+        }
+      break;
     case 0x5c: // throw
       if ( mem->sf_mem[0] >= 5 )
         {
@@ -1044,6 +1070,13 @@ decode_next_inst (
         return false;
       break;
 
+    case 0x7b: // set_colour
+      if ( mem->sf_mem[0] >= 5 )
+        {
+          if ( !ins_2op ( ins, mem, &addr, INSTRUCTION_NAME_SET_COLOUR, err ) )
+            return false;
+        }
+      break;
     case 0x7c: // throw
       if ( mem->sf_mem[0] >= 5 )
         {

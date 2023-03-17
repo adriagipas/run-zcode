@@ -2441,6 +2441,40 @@ copy_table (
 } // end copy_table
 
 
+// Si el color no és suportat torna un no suportat
+static uint16_t
+color2true_color (
+                  const uint16_t color
+                  )
+{
+
+  uint16_t ret;
+
+
+  switch ( color )
+    {
+    case 0x0000: ret= 0xFFFE; break; // Current
+    case 0x0001: ret= 0xFFFF; break; // Default
+    case 0x0002: ret= 0x0000; break; // Black
+    case 0x0003: ret= 0x001D; break; // Red
+    case 0x0004: ret= 0x0340; break; // Green
+    case 0x0005: ret= 0x03BD; break; // Yellow
+    case 0x0006: ret= 0x59A0; break; // Blue
+    case 0x0007: ret= 0x7C1F; break; // Magenta
+    case 0x0008: ret= 0x77A0; break; // Cyan
+    case 0x0009: ret= 0x7FFF; break; // White
+    case 0x000A: ret= 0x5AD6; break; // Light grey
+    case 0x000B: ret= 0x4631; break; // Medium grey
+    case 0x000C: ret= 0x2D6B; break; // Dark grey
+    case 0xFFFF: ret= 0xFFFD; break; // Color baix cursor (V6)
+    default:     ret= 0x8000; // <-- Valor no suportat que s'ignorarà.
+    }
+
+  return ret;
+  
+} // end color2true_color
+
+
 static bool
 inst_be (
          Interpreter  *intp,
@@ -2506,6 +2540,21 @@ inst_be (
             return false;
         }
       if ( !write_var ( intp, result_var, res, err ) ) return false;
+      break;
+
+    case 0x0d: // set_true_colour
+      if ( intp->version == 6 )
+        {
+          msgerror ( err, "@set_true_colour not implemented in version 6" );
+          return false;
+        }
+      else
+        {
+          if ( !read_var_ops ( intp, ops, &nops, 2, false,err ) ) return false;
+          if ( !op_to_u16 ( intp, &(ops[0]), &op1, err ) ) return false;
+          if ( !op_to_u16 ( intp, &(ops[1]), &op2, err ) ) return false;
+          screen_set_colour ( intp->screen, op1, op2 );
+        }
       break;
       
     default: // Unknown
@@ -2699,6 +2748,15 @@ exec_next_inst (
       if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
       break;
 
+    case 0x1b: // set_colour
+      if ( intp->version < 5 ) goto wrong_version;
+      if ( !read_small_small ( intp, &op1_u8, &op2_u8, err ) ) return RET_ERROR;
+      SET_U8TOU16(op1_u8,op1);
+      SET_U8TOU16(op2_u8,op2);
+      screen_set_colour ( intp->screen,
+                          color2true_color ( op1 ),
+                          color2true_color ( op2 ) );
+      break;
     case 0x1c: // throw
       if ( intp->version < 5 ) goto wrong_version;
       if ( !read_small_small ( intp, &op1_u8, &op2_u8, err ) ) return RET_ERROR;
@@ -2845,7 +2903,15 @@ exec_next_inst (
       res= (uint16_t) (((int16_t) op1) % ((int16_t) op2));
       if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
       break;
-
+      
+    case 0x3b: // set_colour
+      if ( intp->version < 5 ) goto wrong_version;
+      if ( !read_small_var ( intp, &op1_u8, &op2, err ) ) return RET_ERROR;
+      SET_U8TOU16(op1_u8,op1);
+      screen_set_colour ( intp->screen,
+                          color2true_color ( op1 ),
+                          color2true_color ( op2 ) );
+      break;
     case 0x3c: // throw
       if ( intp->version < 5 ) goto wrong_version;
       if ( !read_small_var ( intp, &op1_u8, &op2, err ) ) return RET_ERROR;
@@ -2998,6 +3064,14 @@ exec_next_inst (
       if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
       break;
 
+    case 0x5b: // set_colour
+      if ( intp->version < 5 ) goto wrong_version;
+      if ( !read_var_small ( intp, &op1, &op2_u8, err ) ) return RET_ERROR;
+      SET_U8TOU16(op2_u8,op2);
+      screen_set_colour ( intp->screen,
+                          color2true_color ( op1 ),
+                          color2true_color ( op2 ) );
+      break;
     case 0x5c: // throw
       if ( intp->version < 5 ) goto wrong_version;
       if ( !read_var_small ( intp, &op1, &op2_u8, err ) ) return RET_ERROR;
@@ -3124,6 +3198,13 @@ exec_next_inst (
       if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
       break;
 
+    case 0x7b: // set_colour
+      if ( intp->version < 5 ) goto wrong_version;
+      if ( !read_var_var ( intp, &op1, &op2, err ) ) return RET_ERROR;
+      screen_set_colour ( intp->screen,
+                          color2true_color ( op1 ),
+                          color2true_color ( op2 ) );
+      break;
     case 0x7c: // throw
       if ( intp->version < 5 ) goto wrong_version;
       if ( !read_var_var ( intp, &op1, &op2, err ) ) return RET_ERROR;
