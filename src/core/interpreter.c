@@ -2298,6 +2298,150 @@ throw_inst (
 
 
 static bool
+scan_table (
+            Interpreter      *intp,
+            const operand_t  *ops,
+            const int         nops,
+            const uint8_t     result_var,
+            bool             *cond,
+            char            **err
+            )
+{
+
+  uint16_t x,table,len,form,field_size,addr,tmp16,res;
+  uint32_t n;
+  uint8_t tmp8;
+  bool is_word;
+  
+
+  // Prepara.
+  *cond= false;
+  
+  // Obté paràmetres
+  if ( nops < 3 || nops > 4 )
+    {
+      msgerror ( err, "Failed to scan table: wrong number of arguments" );
+      return false;
+    }
+  if ( !op_to_u16 ( intp, &(ops[0]), &x, err ) ) return false;
+  if ( !op_to_u16 ( intp, &(ops[1]), &table, err ) ) return false;
+  if ( !op_to_u16 ( intp, &(ops[2]), &len, err ) ) return false;
+  if ( nops == 4 )
+    {
+      if ( !op_to_u16 ( intp, &(ops[3]), &form, err ) ) return false;
+    }
+  else form= 0x82;
+  is_word= (form&0x80)!=0;
+  field_size= form&0x7f;
+  
+  // Cerca
+  res= 0;
+  addr= table;
+  if ( field_size > 0 && len > 0 )
+    {
+      for ( n= 0; n < (uint32_t) len && !(*cond); ++n )
+        {
+          
+          // Compara
+          if ( is_word )
+            {
+              if ( !memory_map_READW ( intp->mem, addr, &tmp16, true, err ) )
+                return false;
+              if ( tmp16 == x ) { res= addr; *cond= true; }
+            }
+          else
+            {
+              if ( !memory_map_READB ( intp->mem, addr, &tmp8, true, err ) )
+                return false;
+              if ( (uint16_t) tmp8 == x ) { res= addr; *cond= true; }
+            }
+          
+          // Incrementa
+          addr+= field_size;
+          
+        }
+    }
+
+  // Escriu resultat
+  if ( !write_var ( intp, result_var, res, err ) ) return false;
+  
+  return true;
+  
+} // end scan_table
+
+
+static bool
+copy_table (
+            Interpreter     *intp,
+            const uint16_t   first,
+            const uint16_t   second,
+            const uint16_t   size,
+            char           **err
+            )
+{
+
+  uint16_t beg,end,p,q;
+  int16_t len;
+  uint8_t val;
+  bool forward;
+  
+  
+  if ( size == 0 ) return true;
+
+  // Cas especial. Si second és 0 es fica a 0 first.
+  if ( second == 0 )
+    {
+      len= (int16_t) size;
+      if ( len < 0 ) len= -len;
+      beg= first; end= first + len;
+      for ( p= beg; p != end; ++p )
+        {
+          if ( !memory_map_WRITEB ( intp->mem, p, 0x00, true, err ) )
+            return false;
+        }
+    }
+
+  // Cas normal. Copia first en second
+  else
+    {
+
+      // Decideix direcció.
+      len= (int16_t) size;
+      if ( len > 0 ) forward= (first > second);
+      else           { len= -len; forward= true; }
+
+      // Còpia.
+      if ( forward )
+        {
+          beg= first; end= first + len;
+          for ( p= beg, q= second; p != end; ++p, ++q )
+            {
+              if ( !memory_map_READB ( intp->mem, p, &val, true, err ) )
+                return false;
+              if ( !memory_map_WRITEB ( intp->mem, q, val, true, err ) )
+                return false;
+            }
+        }
+      else
+        {
+          beg= first + (len-1); end= first-1;
+          for ( p= beg, q= second + (len-1); p != end; --p, --q )
+            {
+              if ( !memory_map_READB ( intp->mem, p, &val, true, err ) )
+                return false;
+              if ( !memory_map_WRITEB ( intp->mem, q, val, true, err ) )
+                return false;
+            }
+        }
+      
+    }
+  
+  return true;
+  
+} // end copy_table
+
+
+static bool
 inst_be (
          Interpreter  *intp,
          char        **err
@@ -3543,7 +3687,16 @@ exec_next_inst (
                            false, err ) ) return RET_ERROR;
       if ( !output_stream ( intp, ops, nops, err ) ) return RET_ERROR;
       break;
-      
+
+    case 0xf7: // scan_table
+      if ( intp->version < 4 ) goto wrong_version;
+      if ( !read_var_ops_store ( intp, ops, &nops, -1,
+                                 false, &result_var, err ) )
+        return RET_ERROR;
+      if ( !scan_table ( intp, ops, nops, result_var, &cond, err ) )
+        return RET_ERROR;
+      if ( !branch ( intp, cond, err ) ) return RET_ERROR;
+      break;
     case 0xf8: // not
       if ( intp->version < 5 ) goto wrong_version;
       if ( !read_var_ops_store ( intp, ops, &nops, 1,
@@ -3568,6 +3721,14 @@ exec_next_inst (
         return RET_ERROR;
       break;
 
+    case 0xfd: // copy_table
+      if ( intp->version < 5 ) goto wrong_version;
+      if ( !read_var_ops ( intp, ops, &nops, 3, false, err ) ) return RET_ERROR;
+      if ( !op_to_u16 ( intp, &(ops[0]), &op1, err ) ) return RET_ERROR;
+      if ( !op_to_u16 ( intp, &(ops[1]), &op2, err ) ) return RET_ERROR;
+      if ( !op_to_u16 ( intp, &(ops[2]), &op3, err ) ) return RET_ERROR;
+      if ( !copy_table ( intp, op1, op2, op3, err ) ) return RET_ERROR;
+      break;
     case 0xfe: // print_table
       if ( intp->version < 5 ) goto wrong_version;
       if ( !read_var_ops ( intp, ops, &nops, -1, false, err ) )
