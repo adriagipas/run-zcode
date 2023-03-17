@@ -94,6 +94,14 @@ typedef struct
       uint16_t N;
     }       o3[INTP_MAX_OSTREAM3];
   } ostreams;
+
+  // Extra characters
+  struct
+  {
+    bool     enabled;
+    uint8_t  N;
+    uint16_t v[256];
+  } echars;
   
 } Interpreter;
 

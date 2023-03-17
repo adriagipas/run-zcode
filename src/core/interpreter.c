@@ -129,6 +129,80 @@ static const char ZSCII_ENC_V1[3][26]=
      '!','?','_','#','\'','"','/','\\','<','-',':','(',')'}
   };
 
+// 155-251
+static const uint16_t ZSCII_TO_UNICODE[97]=
+  {
+    0x00e4, // ä
+    0x00f6, // ö
+    0x00fc, // ü
+    0x00c4, // Ä
+    0x00d6, // Ö
+    0x00dc, // Ü
+    0x00df, // ß
+    0x00bb, // »
+    0x00ab, // «
+    0x00eb, // ë
+    0x00ef, // ï
+    0x00ff, // ÿ
+    0x00cb, // Ë
+    0x00cf, // Ï
+    0x00e1, // á
+    0x00e9, // é
+    0x00ed, // í
+    0x00f3, // ó
+    0x00fa, // ú
+    0x00fd, // ý
+    0x00c1, // Á
+    0x00c9, // É
+    0x00cd, // Í
+    0x00d3, // Ó
+    0x00da, // Ú
+    0x00dd, // Ý
+    0x00e0, // à
+    0x00e8, // è
+    0x00ec, // ì
+    0x00f2, // ò
+    0x00f9, // ù
+    0x00c0, // À
+    0x00c8, // È
+    0x00cc, // Ì
+    0x00d2, // Ò
+    0x00d9, // Ù
+    0x00e2, // â
+    0x00ea, // ê
+    0x00ee, // î
+    0x00f4, // ô
+    0x00fb, // û
+    0x00c2, // Â
+    0x00ca, // Ê
+    0x00ce, // Î
+    0x00d4, // Ô
+    0x00db, // Û
+    0x00e5, // å
+    0x00c5, // Å
+    0x00f8, // ø
+    0x00d8, // Ø
+    0x00e3, // ã
+    0x00f1, // ñ
+    0x00f5, // õ
+    0x00c3, // Ã
+    0x00d1, // Ñ
+    0x00d5, // Õ
+    0x00e6, // æ
+    0x00c6, // Æ
+    0x00e7, // ç
+    0x00c7, // Ç
+    0x00fe, // þ
+    0x00f0, // ð
+    0x00de, // Þ
+    0x00d0, // Ð
+    0x00a3, // £
+    0x0153, // œ
+    0x0152, // Œ
+    0x00a1, // ¡
+    0x00bf  // ¿
+  };
+
 
 
 
@@ -422,6 +496,7 @@ read_var_ops (
               operand_t    *ops,
               int          *nops,
               const int     wanted_ops, // -1 vol dir que no es demana
+              const bool    extra_byte,
               char        **err
               )
 {
@@ -441,6 +516,19 @@ read_var_ops (
     {
       ++N;
       ops_type<<= 2;
+    }
+  if ( extra_byte )
+    {
+      if ( !memory_map_READB ( intp->mem, state->PC++, &ops_type, true, err ) )
+        return false;
+      if ( N == 4 ) // Llig si no hi han NONE
+        {
+          while ( N < 8 && (ops[N].type= (ops_type>>6)) != OP_NONE )
+            {
+              ++N;
+              ops_type<<= 2;
+            }
+        }
     }
   if ( wanted_ops != -1 && wanted_ops != N )
     {
@@ -657,12 +745,13 @@ read_var_ops_store (
                     operand_t    *ops,
                     int          *nops,
                     const int     wanted_ops,
+                    const bool    extra_byte,
                     uint8_t      *store_var,
                     char        **err
                     )
 {
-
-  if ( !read_var_ops ( intp, ops, nops, wanted_ops, err ) )
+  
+  if ( !read_var_ops ( intp, ops, nops, wanted_ops, extra_byte, err ) )
     return false;
   if ( !memory_map_READB ( intp->mem, intp->state->PC++,
                            store_var, true, err ) )
@@ -1212,6 +1301,43 @@ text_add (
 
 
 static bool
+text_add_unicode (
+                  Interpreter     *intp,
+                  const uint16_t   c,
+                  char           **err
+                  )
+{
+
+  uint8_t val;
+
+  
+  if ( c <= 0x007f )
+    {
+      if ( !text_add ( intp, (char) c, err ) ) return false;
+    }
+  else if ( c <= 0x07ff )
+    {
+      val= ((uint8_t) (c>>6)) | 0xc0;
+      if ( !text_add ( intp, (char) val, err ) ) return false;
+      val= ((uint8_t) (c&0x3f)) | 0x80;
+      if ( !text_add ( intp, (char) val, err ) ) return false;
+    }
+  else
+    {
+      val= ((uint8_t) (c>>12)) | 0xe0;
+      if ( !text_add ( intp, (char) val, err ) ) return false;
+      val= ((uint8_t) ((c>>6)&0x3f)) | 0x80;
+      if ( !text_add ( intp, (char) val, err ) ) return false;
+      val= ((uint8_t) (c&0x3f)) | 0x80;
+      if ( !text_add ( intp, (char) val, err ) ) return false;
+    }
+
+  return true;
+  
+} // end text_add_unicode
+
+
+static bool
 zscii_char2utf8 (
                  Interpreter     *intp,
                  const uint16_t   val,
@@ -1259,7 +1385,16 @@ zscii_char2utf8 (
   else if ( zc < 155 ) goto wrong_zc;
   else if ( zc < 252 ) // extra characters
     {
-      ee ( "CAL IMPLEMENTAR extra characters" );
+      if ( intp->echars.enabled )
+        {
+          if ( !text_add_unicode ( intp, intp->echars.v[zc-155], err ) )
+            return false;
+        }
+      else
+        {
+          if ( !text_add_unicode ( intp, ZSCII_TO_UNICODE[zc-155], err ) )
+            return false;
+        }
     }
   else goto wrong_zc;
   
@@ -1432,6 +1567,115 @@ zscii2utf8 (
 } // end zscii2utf8
 
 
+static uint8_t
+unicode2zscii (
+               Interpreter    *intp,
+               const uint32_t  val
+               )
+{
+
+  uint8_t ret;
+  int n;
+
+  
+  // No es suporten caràcters de més de 16bit
+  if ( val >= 0xFFFF ) ret= '?';
+
+  // Taula concreta.
+  else if ( intp->echars.enabled )
+    {
+      ret= '?';
+      for ( n= 0; n < (int) ((uint16_t) intp->echars.N); ++n )
+        if ( intp->echars.v[n] == ((uint16_t) val) )
+          {
+            ret= n + 155;
+            break;
+          }
+    }
+  
+  // Valors per defecte.
+  else
+    {
+      switch ( (uint16_t) val )
+        {
+        case 0x00e4: ret= 155; break;
+        case 0x00f6: ret= 156; break;
+        case 0x00fc: ret= 157; break;
+        case 0x00c4: ret= 158; break;
+        case 0x00d6: ret= 159; break;
+        case 0x00dc: ret= 160; break;
+        case 0x00df: ret= 161; break;
+        case 0x00bb: ret= 162; break;
+        case 0x00ab: ret= 163; break;
+        case 0x00eb: ret= 164; break;
+        case 0x00ef: ret= 165; break;
+        case 0x00ff: ret= 166; break;
+        case 0x00cb: ret= 167; break;
+        case 0x00cf: ret= 168; break;
+        case 0x00e1: ret= 169; break;
+        case 0x00e9: ret= 170; break;
+        case 0x00ed: ret= 171; break;
+        case 0x00f3: ret= 172; break;
+        case 0x00fa: ret= 173; break;
+        case 0x00fd: ret= 174; break;
+        case 0x00c1: ret= 175; break;
+        case 0x00c9: ret= 176; break;
+        case 0x00cd: ret= 177; break;
+        case 0x00d3: ret= 178; break;
+        case 0x00da: ret= 179; break;
+        case 0x00dd: ret= 180; break;
+        case 0x00e0: ret= 181; break;
+        case 0x00e8: ret= 182; break;
+        case 0x00ec: ret= 183; break;
+        case 0x00f2: ret= 184; break;
+        case 0x00f9: ret= 185; break;
+        case 0x00c0: ret= 186; break;
+        case 0x00c8: ret= 187; break;
+        case 0x00cc: ret= 188; break;
+        case 0x00d2: ret= 189; break;
+        case 0x00d9: ret= 190; break;
+        case 0x00e2: ret= 191; break;
+        case 0x00ea: ret= 192; break;
+        case 0x00ee: ret= 193; break;
+        case 0x00f4: ret= 194; break;
+        case 0x00fb: ret= 195; break;
+        case 0x00c2: ret= 196; break;
+        case 0x00ca: ret= 197; break;
+        case 0x00ce: ret= 198; break;
+        case 0x00d4: ret= 199; break;
+        case 0x00db: ret= 200; break;
+        case 0x00e5: ret= 201; break;
+        case 0x00c5: ret= 202; break;
+        case 0x00f8: ret= 203; break;
+        case 0x00d8: ret= 204; break;
+        case 0x00e3: ret= 205; break;
+        case 0x00f1: ret= 206; break;
+        case 0x00f5: ret= 207; break;
+        case 0x00c3: ret= 208; break;
+        case 0x00d1: ret= 209; break;
+        case 0x00d5: ret= 210; break;
+        case 0x00e6: ret= 211; break;
+        case 0x00c6: ret= 212; break;
+        case 0x00e7: ret= 213; break;
+        case 0x00c7: ret= 214; break;
+        case 0x00fe: ret= 215; break;
+        case 0x00f0: ret= 216; break;
+        case 0x00de: ret= 217; break;
+        case 0x00d0: ret= 218; break;
+        case 0x00a3: ret= 219; break;
+        case 0x0153: ret= 220; break;
+        case 0x0152: ret= 221; break;
+        case 0x00a1: ret= 222; break;
+        case 0x00bf: ret= 223; break;
+        default: ret= '?';
+        }
+    }
+
+  return ret;
+  
+} // end unicode_zscii
+
+
 static bool
 print_output3 (
                Interpreter  *intp,
@@ -1442,11 +1686,12 @@ print_output3 (
 
   const char *p;
   uint8_t zc,val;
-  uint32_t addr;
-  int o_ind;
+  uint32_t addr,unicode_val;
+  int o_ind,unicode_count;
   
-
+  
   o_ind= intp->ostreams.N3-1;
+  unicode_count= 0;
   for ( p= text; *p != '\0'; ++p )
     {
 
@@ -1467,9 +1712,38 @@ print_output3 (
       // --> Resta caràcters
       else
         {
-          ee ("print_output - CAL IMPLEMENTAR EXTRA CHARS");
+          // NOTA!!! Per simplificar els caràcters UTF-8 a mitat no
+          // els pinte com a ?, simplement els ignore.
+          if ( (val&0xf8) == 0xf0 )
+            {
+              unicode_count= 3;
+              unicode_val= (uint32_t) (val&0x7);
+              continue;
+            }
+          else if ( (val&0xf0) == 0xe0 )
+            {
+              unicode_count= 2;
+              unicode_val= (uint32_t) (val&0xf);
+              continue;
+            }
+          else if ( (val&0xe0) == 0xc0 )
+            {
+              unicode_count= 1;
+              unicode_val= (uint32_t) (val&0x1f);
+              continue;
+            }
+          else if ( (val&0xc0) == 0x80 )
+            {
+              unicode_val<<= 6;
+              unicode_val|= (uint8_t) (val&0x3f);
+              if ( --unicode_count == 0 )
+                zc= unicode2zscii ( intp, unicode_val );
+              else continue;
+            }
+          // Pot passar ??
+          else zc= '?';
         }
-
+      
       // Escriu
       addr=
         intp->ostreams.o3[o_ind].addr +
@@ -1962,7 +2236,8 @@ inst_be (
     {
 
     case 0x02: // log_shift
-      if ( !read_var_ops_store ( intp, ops, &nops, 2, &result_var, err ) )
+      if ( !read_var_ops_store ( intp, ops, &nops, 2,
+                                 false, &result_var, err ) )
         return false;
       if ( !op_to_u16 ( intp, &(ops[0]), &op1, err ) ) return false;
       if ( !op_to_u16 ( intp, &(ops[1]), &op2, err ) ) return false;
@@ -1973,7 +2248,8 @@ inst_be (
       if ( !write_var ( intp, result_var, res, err ) ) return false;
       break;
     case 0x03: // art_shift
-      if ( !read_var_ops_store ( intp, ops, &nops, 2, &result_var, err ) )
+      if ( !read_var_ops_store ( intp, ops, &nops, 2,
+                                 false, &result_var, err ) )
         return false;
       if ( !op_to_u16 ( intp, &(ops[0]), &op1, err ) ) return false;
       if ( !op_to_u16 ( intp, &(ops[1]), &op2, err ) ) return false;
@@ -1985,13 +2261,15 @@ inst_be (
       break;
 
     case 0x09: // save_undo
-      if ( !read_var_ops_store ( intp, ops, &nops, 0, &result_var, err ) )
+      if ( !read_var_ops_store ( intp, ops, &nops, 0,
+                                 false, &result_var, err ) )
         return false;
       res= save_undo ( intp );
       if ( !write_var ( intp, result_var, res, err ) ) return false;
       break;
     case 0x0a: // restore_undo
-      if ( !read_var_ops_store ( intp, ops, &nops, 0, &result_var, err ) )
+      if ( !read_var_ops_store ( intp, ops, &nops, 0,
+                                 false, &result_var, err ) )
         return false;
       res= restore_undo ( intp );
       if ( res == 2 ) // Exit
@@ -2869,7 +3147,8 @@ exec_next_inst (
       break;
       
     case 0xc1: // je
-      if ( !read_var_ops ( intp, ops, &nops, -1, err ) ) return RET_ERROR;
+      if ( !read_var_ops ( intp, ops, &nops, -1,
+                           false, err ) ) return RET_ERROR;
       if ( nops == 0 )
         {
           msgerror ( err, "(je) Expected at least 1 operand but 0 found" );
@@ -2886,7 +3165,7 @@ exec_next_inst (
       break;
 
     case 0xc3: // jg
-      if ( !read_var_ops ( intp, ops, &nops, 2, err ) ) return RET_ERROR;
+      if ( !read_var_ops ( intp, ops, &nops, 2, false, err ) ) return RET_ERROR;
       if ( !op_to_u16 ( intp, &(ops[0]), &op1, err ) ) return RET_ERROR;
       if ( !op_to_u16 ( intp, &(ops[1]), &op2, err ) ) return RET_ERROR;
       if ( !branch ( intp, ((int16_t) op1) > ((int16_t) op2), err ) )
@@ -2894,7 +3173,7 @@ exec_next_inst (
       break;
 
     case 0xc4: // dec_chk
-      if ( !read_var_ops ( intp, ops, &nops, 2, err ) ) return RET_ERROR;
+      if ( !read_var_ops ( intp, ops, &nops, 2, false, err ) ) return RET_ERROR;
       if ( !op_to_refvar ( intp, &(ops[0]), &op1_u8, err ) )
         return RET_ERROR;
       if ( !op_to_u16 ( intp, &(ops[1]), &op2, err ) ) return RET_ERROR;
@@ -2905,7 +3184,7 @@ exec_next_inst (
         return RET_ERROR;
       break;
     case 0xc5: // inc_chk
-      if ( !read_var_ops ( intp, ops, &nops, 2, err ) ) return RET_ERROR;
+      if ( !read_var_ops ( intp, ops, &nops, 2, false, err ) ) return RET_ERROR;
       if ( !op_to_refvar ( intp, &(ops[0]), &op1_u8, err ) )
         return RET_ERROR;
       if ( !op_to_u16 ( intp, &(ops[1]), &op2, err ) ) return RET_ERROR;
@@ -2917,7 +3196,8 @@ exec_next_inst (
       break;
       
     case 0xc8: // or
-      if ( !read_var_ops_store ( intp, ops, &nops, 2, &result_var, err ) )
+      if ( !read_var_ops_store ( intp, ops, &nops, 2,
+                                 false, &result_var, err ) )
         return RET_ERROR;
       if ( !op_to_u16 ( intp, &(ops[0]), &op1, err ) ) return RET_ERROR;
       if ( !op_to_u16 ( intp, &(ops[1]), &op2, err ) ) return RET_ERROR;
@@ -2925,7 +3205,8 @@ exec_next_inst (
       if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
       break;
     case 0xc9: // and
-      if ( !read_var_ops_store ( intp, ops, &nops, 2, &result_var, err ) )
+      if ( !read_var_ops_store ( intp, ops, &nops, 2,
+                                 false, &result_var, err ) )
         return RET_ERROR;
       if ( !op_to_u16 ( intp, &(ops[0]), &op1, err ) ) return RET_ERROR;
       if ( !op_to_u16 ( intp, &(ops[1]), &op2, err ) ) return RET_ERROR;
@@ -2934,7 +3215,7 @@ exec_next_inst (
       break;
 
     case 0xcd: // store
-      if ( !read_var_ops ( intp, ops, &nops, 2, err ) ) return RET_ERROR;
+      if ( !read_var_ops ( intp, ops, &nops, 2, false, err ) ) return RET_ERROR;
       if ( ops[0].type != OP_SMALL )
         {
           msgerror ( err, "Failed to execute @store: Trying to"
@@ -2949,7 +3230,8 @@ exec_next_inst (
       break;
 
     case 0xcf: // loadw
-      if ( !read_var_ops_store ( intp, ops, &nops, 2, &result_var, err ) )
+      if ( !read_var_ops_store ( intp, ops, &nops, 2,
+                                 false, &result_var, err ) )
         return RET_ERROR;
       if ( !op_to_u16 ( intp, &(ops[0]), &op1, err ) ) return RET_ERROR;
       if ( !op_to_u16 ( intp, &(ops[1]), &op2, err ) ) return RET_ERROR;
@@ -2959,7 +3241,8 @@ exec_next_inst (
       if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
       break;
     case 0xd0: // loadb
-      if ( !read_var_ops_store ( intp, ops, &nops, 2, &result_var, err ) )
+      if ( !read_var_ops_store ( intp, ops, &nops, 2,
+                                 false, &result_var, err ) )
         return RET_ERROR;
       if ( !op_to_u16 ( intp, &(ops[0]), &op1, err ) ) return RET_ERROR;
       if ( !op_to_u16 ( intp, &(ops[1]), &op2, err ) ) return RET_ERROR;
@@ -2971,7 +3254,8 @@ exec_next_inst (
       break;
 
     case 0xd4: // add
-      if ( !read_var_ops_store ( intp, ops, &nops, 2, &result_var, err ) )
+      if ( !read_var_ops_store ( intp, ops, &nops, 2,
+                                 false, &result_var, err ) )
         return RET_ERROR;
       if ( !op_to_u16 ( intp, &(ops[0]), &op1, err ) ) return RET_ERROR;
       if ( !op_to_u16 ( intp, &(ops[1]), &op2, err ) ) return RET_ERROR;
@@ -2979,7 +3263,8 @@ exec_next_inst (
       if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
       break;
     case 0xd5: // sub
-      if ( !read_var_ops_store ( intp, ops, &nops, 2, &result_var, err ) )
+      if ( !read_var_ops_store ( intp, ops, &nops, 2,
+                                 false, &result_var, err ) )
         return RET_ERROR;
       if ( !op_to_u16 ( intp, &(ops[0]), &op1, err ) ) return RET_ERROR;
       if ( !op_to_u16 ( intp, &(ops[1]), &op2, err ) ) return RET_ERROR;
@@ -2987,7 +3272,8 @@ exec_next_inst (
       if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
       break;
     case 0xd6: // mul
-      if ( !read_var_ops_store ( intp, ops, &nops, 2, &result_var, err ) )
+      if ( !read_var_ops_store ( intp, ops, &nops, 2,
+                                 false, &result_var, err ) )
         return RET_ERROR;
       if ( !op_to_u16 ( intp, &(ops[0]), &op1, err ) ) return RET_ERROR;
       if ( !op_to_u16 ( intp, &(ops[1]), &op2, err ) ) return RET_ERROR;
@@ -2995,7 +3281,8 @@ exec_next_inst (
       if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
       break;
     case 0xd7: // div
-      if ( !read_var_ops_store ( intp, ops, &nops, 2, &result_var, err ) )
+      if ( !read_var_ops_store ( intp, ops, &nops, 2,
+                                 false, &result_var, err ) )
         return RET_ERROR;
       if ( !op_to_u16 ( intp, &(ops[0]), &op1, err ) ) return RET_ERROR;
       if ( !op_to_u16 ( intp, &(ops[1]), &op2, err ) ) return RET_ERROR;
@@ -3004,7 +3291,8 @@ exec_next_inst (
       if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
       break;
     case 0xd8: // mod
-      if ( !read_var_ops_store ( intp, ops, &nops, 2, &result_var, err ) )
+      if ( !read_var_ops_store ( intp, ops, &nops, 2,
+                                 false, &result_var, err ) )
         return RET_ERROR;
       if ( !op_to_u16 ( intp, &(ops[0]), &op1, err ) ) return RET_ERROR;
       if ( !op_to_u16 ( intp, &(ops[1]), &op2, err ) ) return RET_ERROR;
@@ -3014,25 +3302,27 @@ exec_next_inst (
       break;
     case 0xd9: // call_2s
       if ( intp->version < 4 ) goto wrong_version;
-      if ( !read_var_ops_store ( intp, ops, &nops, 2, &result_var, err ) )
+      if ( !read_var_ops_store ( intp, ops, &nops, 2,
+                                 false, &result_var, err ) )
         return RET_ERROR;
       if ( !call_routine ( intp, ops, nops, result_var, false, err ) )
         return RET_ERROR;
       break;
     case 0xda: // call_2n
       if ( intp->version < 5 ) goto wrong_version;
-      if ( !read_var_ops ( intp, ops, &nops, 2, err ) ) return RET_ERROR;
+      if ( !read_var_ops ( intp, ops, &nops, 2, false, err ) ) return RET_ERROR;
       if ( !call_routine ( intp, ops, nops, 0, true, err ) ) return RET_ERROR;
       break;
       
     case 0xe0: // call_vs
-      if ( !read_var_ops_store ( intp, ops, &nops, -1, &result_var, err ) )
+      if ( !read_var_ops_store ( intp, ops, &nops, -1,
+                                 false, &result_var, err ) )
         return RET_ERROR;
       if ( !call_routine ( intp, ops, nops, result_var, false, err ) )
         return RET_ERROR;
       break;
     case 0xe1: // storew
-      if ( !read_var_ops ( intp, ops, &nops, 3, err ) ) return RET_ERROR;
+      if ( !read_var_ops ( intp, ops, &nops, 3, false, err ) ) return RET_ERROR;
       if ( !op_to_u16 ( intp, &(ops[0]), &op1, err ) ) return RET_ERROR;
       if ( !op_to_u16 ( intp, &(ops[1]), &op2, err ) ) return RET_ERROR;
       if ( !op_to_u16 ( intp, &(ops[2]), &op3, err ) ) return RET_ERROR;
@@ -3041,7 +3331,7 @@ exec_next_inst (
         return RET_ERROR;
       break;
     case 0xe2: // storeb
-      if ( !read_var_ops ( intp, ops, &nops, 3, err ) ) return RET_ERROR;
+      if ( !read_var_ops ( intp, ops, &nops, 3, false, err ) ) return RET_ERROR;
       if ( !op_to_u16 ( intp, &(ops[0]), &op1, err ) ) return RET_ERROR;
       if ( !op_to_u16 ( intp, &(ops[1]), &op2, err ) ) return RET_ERROR;
       if ( !op_to_u16 ( intp, &(ops[2]), &op3, err ) ) return RET_ERROR;
@@ -3051,7 +3341,7 @@ exec_next_inst (
         return RET_ERROR;
       break;
     case 0xe3: // put_prop
-      if ( !read_var_ops ( intp, ops, &nops, 3, err ) ) return RET_ERROR;
+      if ( !read_var_ops ( intp, ops, &nops, 3, false, err ) ) return RET_ERROR;
       if ( !op_to_u16 ( intp, &(ops[0]), &op1, err ) ) return RET_ERROR;
       if ( !op_to_u16 ( intp, &(ops[1]), &op2, err ) ) return RET_ERROR;
       if ( !op_to_u16 ( intp, &(ops[2]), &op3, err ) ) return RET_ERROR;
@@ -3060,7 +3350,8 @@ exec_next_inst (
     case 0xe4: // read
       if ( intp->version >= 5 )
         {
-          if ( !read_var_ops_store ( intp, ops, &nops, -1, &result_var, err ) )
+          if ( !read_var_ops_store ( intp, ops, &nops, -1,
+                                     false, &result_var, err ) )
             return RET_ERROR;
           if ( !sread ( intp, ops, nops, result_var, err ) ) return RET_ERROR;
         }
@@ -3071,18 +3362,18 @@ exec_next_inst (
         }
       break;
     case 0xe5: // print_char
-      if ( !read_var_ops ( intp, ops, &nops, 1, err ) ) return RET_ERROR;
+      if ( !read_var_ops ( intp, ops, &nops, 1, false, err ) ) return RET_ERROR;
       if ( !op_to_u16 ( intp, &(ops[0]), &op1, err ) ) return RET_ERROR;
       if ( !print_char ( intp, op1, err ) ) return RET_ERROR;
       break;
     case 0xe6: // print_num
-      if ( !read_var_ops ( intp, ops, &nops, 1, err ) ) return RET_ERROR;
+      if ( !read_var_ops ( intp, ops, &nops, 1, false, err ) ) return RET_ERROR;
       if ( !op_to_u16 ( intp, &(ops[0]), &op1, err ) ) return RET_ERROR;
       if ( !print_num ( intp, op1, err ) ) return RET_ERROR;
       break;
 
     case 0xe8: // push
-      if ( !read_var_ops ( intp, ops, &nops, 1, err ) ) return RET_ERROR;
+      if ( !read_var_ops ( intp, ops, &nops, 1, false, err ) ) return RET_ERROR;
       if ( !op_to_u16 ( intp, &(ops[0]), &op1, err ) ) return RET_ERROR;
       if ( !write_var ( intp, 0, op1, err ) ) return RET_ERROR;
       break;
@@ -3094,7 +3385,8 @@ exec_next_inst (
         }
       else
         {
-          if ( !read_var_ops ( intp, ops, &nops, 1, err ) ) return RET_ERROR;
+          if ( !read_var_ops ( intp, ops, &nops, 1,
+                               false, err ) ) return RET_ERROR;
           if ( !op_to_refvar ( intp, &(ops[0]), &op1_u8, err ) )
             return RET_ERROR;
           if ( !read_var ( intp, 0, &op1, err ) ) return RET_ERROR;
@@ -3109,20 +3401,22 @@ exec_next_inst (
 
     case 0xf1: // set_text_style
       if ( intp->version < 4 ) goto wrong_version;
-      if ( !read_var_ops ( intp, ops, &nops, 1, err ) ) return RET_ERROR;
+      if ( !read_var_ops ( intp, ops, &nops, 1, false, err ) ) return RET_ERROR;
       if ( !op_to_u16 ( intp, &(ops[0]), &op1, err ) ) return RET_ERROR;
       screen_set_style ( intp->screen, op1 );
       break;
 
     case 0xf3: // output_stream
       if ( intp->version < 3 ) goto wrong_version;
-      if ( !read_var_ops ( intp, ops, &nops, -1, err ) ) return RET_ERROR;
+      if ( !read_var_ops ( intp, ops, &nops, -1,
+                           false, err ) ) return RET_ERROR;
       if ( !output_stream ( intp, ops, nops, err ) ) return RET_ERROR;
       break;
       
     case 0xf8: // not
       if ( intp->version < 5 ) goto wrong_version;
-      if ( !read_var_ops_store ( intp, ops, &nops, 1, &result_var, err ) )
+      if ( !read_var_ops_store ( intp, ops, &nops, 1,
+                                 false, &result_var, err ) )
         return RET_ERROR;
       if ( !op_to_u16 ( intp, &(ops[0]), &op1, err ) ) return false;
       res= ~op1;
@@ -3130,15 +3424,22 @@ exec_next_inst (
       break;
     case 0xf9: // call_vn
       if ( intp->version < 5 ) goto wrong_version;
-      if ( !read_var_ops ( intp, ops, &nops, -1, err ) )
+      if ( !read_var_ops ( intp, ops, &nops, -1, false, err ) )
         return RET_ERROR;
       if ( !call_routine ( intp, ops, nops, 0x00, true, err ) )
         return RET_ERROR;
       break;
-
+    case 0xfa: // call_vn2
+      if ( intp->version < 5 ) goto wrong_version;
+      if ( !read_var_ops ( intp, ops, &nops, -1, true, err ) )
+        return RET_ERROR;
+      if ( !call_routine ( intp, ops, nops, 0x00, true, err ) )
+        return RET_ERROR;
+      break;
+      
     case 0xff: // check_arg_count
       if ( intp->version < 5 ) goto wrong_version;
-      if ( !read_var_ops ( intp, ops, &nops, 1, err ) ) return RET_ERROR;
+      if ( !read_var_ops ( intp, ops, &nops, 1, false, err ) ) return RET_ERROR;
       if ( !op_to_u16 ( intp, &(ops[0]), &op1, err ) ) return RET_ERROR;
       if ( !branch ( intp, (FRAME_ARGS(state)&(1<<(op1-1)))!=0, err ) )
         return RET_ERROR;
@@ -3159,6 +3460,82 @@ exec_next_inst (
   return RET_ERROR;
   
 } // end exec_next_inst
+
+
+static bool
+load_unicode_translation_table (
+                                Interpreter     *intp,
+                                const uint32_t   addr,
+                                char           **err
+                                )
+{
+
+  int n;
+  
+  
+  // Inicialitza taula a desconegut.
+  intp->echars.enabled= true;
+  for ( n= 0; n < 256; ++n )
+    intp->echars.v[n]= 0xFFFD;
+
+  // Llig nombre entrades.
+  if ( !memory_map_READB ( intp->mem, addr, &intp->echars.N, true, err ) )
+    return false;
+
+  // Llig entrades.
+  for ( n= 0; n < (int) ((uint16_t) intp->echars.N); ++n )
+    {
+      if ( !memory_map_READW ( intp->mem, addr + 1 + n*2,
+                               &(intp->echars.v[n]), true, err ) )
+        return false;
+    }
+
+  return true;
+  
+} // end load_unicode_translation_table
+
+
+static bool
+load_header_extension_table (
+                             Interpreter  *intp,
+                             char        **err
+                             )
+{
+
+  uint32_t ext_addr;
+  uint16_t N,tmp;
+  
+  
+  // Inicialització de valors depenent.
+  intp->echars.enabled= false;
+
+  // Intenta llegir.
+  if ( intp->version < 5 ) return true;
+  ext_addr=
+    (((uint32_t) intp->mem->sf_mem[0x36])<<8) |
+    ((uint32_t) intp->mem->sf_mem[0x37])
+    ;
+  if ( ext_addr == 0 ) return true;
+
+  // Llig taula
+  // --> Nombre d'entrades
+  if ( !memory_map_READW ( intp->mem, ext_addr, &N, true, err ) )
+    return false;
+  // --> Unicode translation table address
+  if ( N >= 3 )
+    {
+      if ( !memory_map_READW ( intp->mem, ext_addr+3*2, &tmp, true, err ) )
+        return false;
+      if ( tmp != 0 )
+        {
+          if ( !load_unicode_translation_table ( intp, (uint32_t) tmp, err ) )
+            return false;
+        }
+    }
+  
+  return true;
+  
+} // end load_header_extension_table
 
 
 
@@ -3299,6 +3676,9 @@ interpreter_new_from_file_name (
   // Output streams
   ret->ostreams.active= INTP_OSTREAM_SCREEN;
   ret->ostreams.N3= 0;
+
+  // Header extension table
+  if ( !load_header_extension_table ( ret, err ) ) goto error;
   
   return ret;
   
