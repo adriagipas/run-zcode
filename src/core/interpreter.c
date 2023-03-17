@@ -1899,6 +1899,59 @@ print_char (
 
 
 static bool
+print_table (
+             Interpreter      *intp,
+             const operand_t  *ops,
+             const int         nops,
+             char            **err
+             )
+{
+
+  uint16_t text,width,height,skip;
+  uint32_t r,c,addr;
+  uint8_t zc;
+  
+  
+  // Obté paràmetres
+  if ( nops < 2 || nops > 4 )
+    {
+      msgerror ( err, "Failed to print table: wrong number of arguments" );
+      return false;
+    }
+  if ( !op_to_u16 ( intp, &(ops[0]), &text, err ) ) return false;
+  if ( !op_to_u16 ( intp, &(ops[1]), &width, err ) ) return false;
+  if ( nops >= 3 )
+    {
+      if ( !op_to_u16 ( intp, &(ops[2]), &height, err ) ) return false;
+    }
+  else height= 1;
+  if ( nops == 4 )
+    {
+      if ( !op_to_u16 ( intp, &(ops[3]), &skip, err ) ) return false;
+    }
+  else skip= 0;
+  if ( height == 0 || width == 0 ) return true;
+
+  // Imprimeix.
+  addr= (uint32_t) text;
+  for ( r= 0; r < (uint32_t) height; ++r )
+    {
+      for ( c= 0; c < (uint32_t) width; ++c )
+        {
+          if ( !memory_map_READB ( intp->mem, addr++, &zc, true, err ) )
+            return false;
+          if ( !print_char ( intp, (uint16_t) zc, err ) ) return false;
+        }
+      if ( !print_char ( intp, ZSCII_NEWLINE, err ) ) return false;
+      addr+= (uint32_t) skip;
+    }
+
+  return true;
+  
+} // end print_table
+
+
+static bool
 print_input_text (
                   Interpreter  *intp,
                   char        **err
@@ -3235,7 +3288,13 @@ exec_next_inst (
         }
       if ( !branch ( intp, cond, err ) ) return RET_ERROR;
       break;
-
+    case 0xc2: // jl
+      if ( !read_var_ops ( intp, ops, &nops, 2, false, err ) ) return RET_ERROR;
+      if ( !op_to_u16 ( intp, &(ops[0]), &op1, err ) ) return RET_ERROR;
+      if ( !op_to_u16 ( intp, &(ops[1]), &op2, err ) ) return RET_ERROR;
+      if ( !branch ( intp, ((int16_t) op1) < ((int16_t) op2), err ) )
+        return RET_ERROR;
+      break;
     case 0xc3: // jg
       if ( !read_var_ops ( intp, ops, &nops, 2, false, err ) ) return RET_ERROR;
       if ( !op_to_u16 ( intp, &(ops[0]), &op1, err ) ) return RET_ERROR;
@@ -3508,7 +3567,13 @@ exec_next_inst (
       if ( !call_routine ( intp, ops, nops, 0x00, true, err ) )
         return RET_ERROR;
       break;
-      
+
+    case 0xfe: // print_table
+      if ( intp->version < 5 ) goto wrong_version;
+      if ( !read_var_ops ( intp, ops, &nops, -1, false, err ) )
+        return RET_ERROR;
+      if ( !print_table ( intp, ops, nops, err ) ) return RET_ERROR;
+      break;
     case 0xff: // check_arg_count
       if ( intp->version < 5 ) goto wrong_version;
       if ( !read_var_ops ( intp, ops, &nops, 1, false, err ) ) return RET_ERROR;

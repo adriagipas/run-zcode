@@ -104,6 +104,7 @@ get_inst_name (
     case INSTRUCTION_NAME_PRINT_NUM       : return "print_num       ";
     case INSTRUCTION_NAME_PRINT_PADDR     : return "print_paddr     ";
     case INSTRUCTION_NAME_PRINT_RET       : return "print_ret       ";
+    case INSTRUCTION_NAME_PRINT_TABLE     : return "print_table     ";
     case INSTRUCTION_NAME_PULL            : return "pull            ";
     case INSTRUCTION_NAME_PUSH            : return "push            ";
     case INSTRUCTION_NAME_PUT_PROP        : return "put_prop        ";

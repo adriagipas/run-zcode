@@ -1273,7 +1273,11 @@ decode_next_inst (
       ins->name= INSTRUCTION_NAME_JE;
       if ( !read_branch ( ins, mem, &addr, err ) ) return false;
       break;
-
+    case 0xc2: // jl
+      if ( !read_var_ops ( ins, mem, &addr, false, err ) ) return false;
+      ins->name= INSTRUCTION_NAME_JE;
+      if ( !read_branch ( ins, mem, &addr, err ) ) return false;
+      break;
     case 0xc3: // jg
       if ( !read_var_ops ( ins, mem, &addr, false, err ) ) return false;
       ins->name= INSTRUCTION_NAME_JG;
@@ -1434,7 +1438,14 @@ decode_next_inst (
           if ( !ins_call ( ins, mem, err ) ) return false;
         }
       break;
-      
+
+    case 0xfe: // print_table
+      if ( mem->sf_mem[0] >= 5 )
+        {
+          if ( !read_var_ops ( ins, mem, &addr, false, err ) ) return false;
+          ins->name= INSTRUCTION_NAME_PRINT_TABLE;
+        }
+      break;
     case 0xff: // check_arg_count
       if ( mem->sf_mem[0] >= 5 )
         {
