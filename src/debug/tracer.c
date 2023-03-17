@@ -72,6 +72,7 @@ get_inst_name (
     case INSTRUCTION_NAME_AND             : return "and             ";
     case INSTRUCTION_NAME_ART_SHIFT       : return "art_shift       ";
     case INSTRUCTION_NAME_CALL            : return "call            ";
+    case INSTRUCTION_NAME_CATCH           : return "catch           ";
     case INSTRUCTION_NAME_CHECK_ARG_COUNT : return "check_arg_count ";
     case INSTRUCTION_NAME_DEC             : return "dec             ";
     case INSTRUCTION_NAME_DEC_CHK         : return "dec_chk         ";
@@ -120,6 +121,7 @@ get_inst_name (
     case INSTRUCTION_NAME_STOREW          : return "storew          ";
     case INSTRUCTION_NAME_SUB             : return "sub             ";
     case INSTRUCTION_NAME_TEST_ATTR       : return "test_attr       ";
+    case INSTRUCTION_NAME_THROW           : return "throw           ";
     case INSTRUCTION_NAME_UNK             :
     default                               : return "unknown         ";
     }

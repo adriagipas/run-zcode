@@ -2215,6 +2215,36 @@ output_stream (
 
 
 static bool
+throw_inst (
+            Interpreter      *intp,
+            const uint16_t    value,
+            const uint16_t    stack_frame,
+            char            **err
+            )
+{
+
+  // NOTA!! No queda clar com funciona açò, faré la implementació més
+  // senzilla, si el stack_frame és superior a l'actual ignora.
+  if ( stack_frame > intp->state->frame_ind )
+    {
+      msgerror ( err,
+                 "Failed to execute throw: provided stack frame (%u)"
+                 " greater than current one (%u)",
+                 stack_frame, intp->state->frame_ind );
+      return false;
+    }
+  while ( stack_frame < intp->state->frame_ind )
+    {
+      if ( !state_free_frame ( intp->state, err ) ) return false;
+    }
+  if ( !ret_val ( intp, value, err ) ) return false;
+
+  return true;
+  
+} // end throw_inst
+
+
+static bool
 inst_be (
          Interpreter  *intp,
          char        **err
@@ -2472,6 +2502,14 @@ exec_next_inst (
       if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
       break;
 
+    case 0x1c: // throw
+      if ( intp->version < 5 ) goto wrong_version;
+      if ( !read_small_small ( intp, &op1_u8, &op2_u8, err ) ) return RET_ERROR;
+      SET_U8TOU16(op1_u8,op1);
+      SET_U8TOU16(op2_u8,op2);
+      if ( !throw_inst ( intp, op1, op2, err ) ) return RET_ERROR;
+      break;
+      
     case 0x21: // je
       if ( !read_small_var ( intp, &op1_u8, &op2, err ) ) return RET_ERROR;
       SET_U8TOU16(op1_u8,op1);
@@ -2609,6 +2647,13 @@ exec_next_inst (
       if ( op2 == 0 ) goto division0;
       res= (uint16_t) (((int16_t) op1) % ((int16_t) op2));
       if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
+      break;
+
+    case 0x3c: // throw
+      if ( intp->version < 5 ) goto wrong_version;
+      if ( !read_small_var ( intp, &op1_u8, &op2, err ) ) return RET_ERROR;
+      SET_U8TOU16(op1_u8,op1);
+      if ( !throw_inst ( intp, op1, op2, err ) ) return RET_ERROR;
       break;
 
     case 0x41: // je
@@ -2756,6 +2801,13 @@ exec_next_inst (
       if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
       break;
 
+    case 0x5c: // throw
+      if ( intp->version < 5 ) goto wrong_version;
+      if ( !read_var_small ( intp, &op1, &op2_u8, err ) ) return RET_ERROR;
+      SET_U8TOU16(op2_u8,op2);
+      if ( !throw_inst ( intp, op1, op2, err ) ) return RET_ERROR;
+      break;
+
     case 0x61: // je
       if ( !read_var_var ( intp, &op1, &op2, err ) ) return RET_ERROR;
       if ( !branch ( intp, op1 == op2, err ) ) return RET_ERROR;
@@ -2873,6 +2925,12 @@ exec_next_inst (
       if ( op2 == 0 ) goto division0;
       res= (uint16_t) (((int16_t) op1) % ((int16_t) op2));
       if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
+      break;
+
+    case 0x7c: // throw
+      if ( intp->version < 5 ) goto wrong_version;
+      if ( !read_var_var ( intp, &op1, &op2, err ) ) return RET_ERROR;
+      if ( !throw_inst ( intp, op1, op2, err ) ) return RET_ERROR;
       break;
       
     case 0x80: // jz
@@ -3133,7 +3191,21 @@ exec_next_inst (
         return RET_ERROR;
       if ( !ret_val ( intp, op1, err ) ) return RET_ERROR;
       break;
-
+    case 0xb9: // catch
+      if ( intp->version >= 5 )
+        {
+          if ( !memory_map_READB ( intp->mem, intp->state->PC++,
+                                   &result_var, true, err ) )
+            return RET_ERROR;
+          res= intp->state->frame_ind;
+          if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
+        }
+      else
+        {
+          msgerror ( err, "pop not implemented in version %d", intp->version );
+          return RET_ERROR;
+        }
+      break;
     case 0xba: // quit
       return RET_STOP;
       break;

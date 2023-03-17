@@ -513,6 +513,29 @@ ins_1op_branch (
 
 
 static bool
+ins_0op_store (
+               Instruction            *ins,
+               const MemoryMap        *mem,
+               uint32_t               *addr,
+               const InstructionName   name,
+               char                  **err
+               )
+{
+
+  ins->name= name;
+  if ( !memory_map_READB ( mem, *addr, &(ins->store_op.u8), true, err ) )
+    return false;
+  ++(*addr);
+  ins->bytes[ins->nbytes++]= ins->store_op.u8;
+  set_variable_type ( &(ins->store_op) );
+  ins->store= true;
+  
+  return true;
+  
+} // end ins_0op_store
+
+
+static bool
 ins_call (
           Instruction      *ins,
           const MemoryMap  *mem,
@@ -738,6 +761,14 @@ decode_next_inst (
         return false;
       break;
 
+    case 0x1c: // throw
+      if ( mem->sf_mem[0] >= 5 )
+        {
+          if ( !ins_2op ( ins, mem, &addr, INSTRUCTION_NAME_THROW, err ) )
+            return false;
+        }
+      break;
+      
     case 0x21: // je
       if ( !ins_2op_branch ( ins, mem, &addr, INSTRUCTION_NAME_JE, err ) )
         return false;
@@ -822,6 +853,14 @@ decode_next_inst (
     case 0x38: // mod
       if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_MOD, err ) )
         return false;
+      break;
+
+    case 0x3c: // throw
+      if ( mem->sf_mem[0] >= 5 )
+        {
+          if ( !ins_2op ( ins, mem, &addr, INSTRUCTION_NAME_THROW, err ) )
+            return false;
+        }
       break;
 
     case 0x41: // je
@@ -909,6 +948,14 @@ decode_next_inst (
       if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_MOD, err ) )
         return false;
       break;
+      
+    case 0x5c: // throw
+      if ( mem->sf_mem[0] >= 5 )
+        {
+          if ( !ins_2op ( ins, mem, &addr, INSTRUCTION_NAME_THROW, err ) )
+            return false;
+        }
+      break;
 
     case 0x61: // je
       if ( !ins_2op_branch ( ins, mem, &addr, INSTRUCTION_NAME_JE, err ) )
@@ -994,6 +1041,14 @@ decode_next_inst (
     case 0x78: // mod
       if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_MOD, err ) )
         return false;
+      break;
+
+    case 0x7c: // throw
+      if ( mem->sf_mem[0] >= 5 )
+        {
+          if ( !ins_2op ( ins, mem, &addr, INSTRUCTION_NAME_THROW, err ) )
+            return false;
+        }
       break;
       
     case 0x80: // jz
@@ -1192,7 +1247,13 @@ decode_next_inst (
     case 0xb8: // ret_popped;
       ins->name= INSTRUCTION_NAME_RET_POPPED;
       break;
-
+    case 0xb9: // catch
+      if ( mem->sf_mem[0] >= 5 )
+        {
+          if ( !ins_0op_store ( ins, mem, &addr, INSTRUCTION_NAME_CATCH, err ) )
+            return false;
+        }
+      break;
     case 0xba: // quit;
       ins->name= INSTRUCTION_NAME_QUIT;
       break;
