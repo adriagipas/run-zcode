@@ -61,6 +61,10 @@ typedef struct
   size_t    N;    // Nombre de bytes (no inclou '\0')
   size_t    Nc;   // Nombre de caràcters UTF-8 (no inclou '\0')
 
+  // Text pendent
+  char     *text_remain; // Inclou '\0'. Buffer auxiliar
+  size_t    size_remain;
+  
   // Altres
   bool buffered; // En realitat el que fa és que si és true intenta no
                  // tallar paraules quan no cap

@@ -270,6 +270,30 @@ resize_cursor (
 } // end resize_cursor
 
 
+static bool
+resize_cursor_remain (
+                      ScreenCursor  *c,
+                      char         **err
+                      )
+{
+
+  size_t nsize;
+
+
+  nsize= c->size_remain*2;
+  if ( nsize < c->size_remain )
+    {
+      msgerror ( err, "resize_cursor_remain - cannot allocate memory" );
+      return false;
+    }
+  c->text_remain= g_renew ( char, c->text_remain, nsize );
+  c->size_remain= nsize;
+
+  return true;
+  
+} // end resize_cursor_remain
+
+
 static void
 draw_render_buf (
                  Screen    *s,
@@ -355,6 +379,33 @@ rewind_to_space (
 } // end rewind_to_space
 
 
+static bool
+copy_remain (
+             ScreenCursor  *c,
+             const size_t   pos,
+             char         **err
+             )
+{
+
+  size_t N;
+  const char *p;
+
+
+  for ( p= &(c->text[pos]), N= 0; *p != '\0'; ++p, ++N )
+    {
+      if ( N == c->size_remain )
+        { if ( !resize_cursor_remain ( c, err ) ) return false; }
+      c->text_remain[N]= *p;
+    }
+  if ( N == c->size_remain )
+    { if ( !resize_cursor_remain ( c, err ) ) return false; }
+  c->text_remain[N]= '\0';
+
+  return true;
+  
+} // end copy_remain
+
+
 // L'estil del cursor actual ja està actualitzat. El text pot ser ""
 // per a indicar nova línia, o directament una línia de text que no
 // inclou \n.
@@ -417,8 +468,16 @@ print_line (
       if ( TTF_MeasureUTF8 ( s->_fonts->_fonts[c->font][c->style], c->text,
                              s->_width - c->x, &extent, &count ) )
         goto error_render;
+      // NOTA!!!! TTF_MeasureUTF8 a vegades es ratlla i vols
+      // desdibuixar més caràcters dels que estem pintant ara (és a
+      // dir, coses que ha pintat ara diuen que no caben), per tal
+      // d'intentar solucionar açò vaig a forçar que count no supere
+      // mai a la longitut del text nou, independentment que amb
+      // buffering calga rebobinar més)
+      // NOTA!! MOLT ESTRANY, LA FULLA NO ACABA DE SOLUCIONAR-HO
       if ( count < new_Nc )
         {
+          if ( count < c->Nc ) count= c->Nc; // <-- FULLA
           rewind_utf8_chars ( c->text, count, &new_N, &new_Nc );
           assert ( count == new_Nc );
           if ( c->buffered )
@@ -428,8 +487,9 @@ print_line (
                    c->space )
                 { new_N= c->N; new_Nc= c->Nc; }
             }
+          if ( !copy_remain ( c, new_N, err ) ) return false;
           c->text[new_N]= '\0';
-          remain+= new_N-c->N;
+          remain= c->text_remain;
         }
       else remain= NULL;
       
@@ -607,8 +667,12 @@ screen_free (
   if ( s->_render_buf != NULL ) SDL_FreeSurface ( s->_render_buf );
   g_free ( s->_split.buf );
   for ( i= 0; i < 2; ++i )
-    if ( s->_cursors[i].text != NULL )
-      g_free ( s->_cursors[i].text );
+    {
+      if ( s->_cursors[i].text != NULL )
+        g_free ( s->_cursors[i].text );
+      if ( s->_cursors[i].text_remain != NULL )
+        g_free ( s->_cursors[i].text_remain );
+    }
   if ( s->_fb != NULL ) g_free ( s->_fb );
   if ( s->_fonts != NULL ) fonts_free ( s->_fonts );
   if ( s->_win != NULL ) window_free ( s->_win );
@@ -642,7 +706,10 @@ screen_new (
   ret->_version= version;
   ret->_fb= NULL;
   for ( n= 0; n < 2; ++n )
-    ret->_cursors[n].text= NULL;
+    {
+      ret->_cursors[n].text= NULL;
+      ret->_cursors[n].text_remain= NULL;
+    }
   ret->_split.buf= NULL;
   ret->_render_buf= NULL;
   ret->_undo.fb= NULL;
@@ -720,6 +787,8 @@ screen_new (
       ret->_cursors[n].Nc= 0;
       ret->_cursors[n].buffered= false;
       ret->_cursors[n].space= false;
+      ret->_cursors[n].text_remain= g_new ( char, 1 );
+      ret->_cursors[n].size_remain= 1;
     }
   ret->_cursors[W_UP].font= F_FPITCH;
   if ( ret->_version == 4 )
