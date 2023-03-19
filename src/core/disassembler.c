@@ -1438,6 +1438,14 @@ decode_next_inst (
           ins->name= INSTRUCTION_NAME_PULL;
         }
       break;
+
+    case 0xed: // erase_window
+      if ( mem->sf_mem[0] >= 4 )
+        {
+          if ( !read_var_ops ( ins, mem, &addr, false, err ) ) return false;
+          ins->name= INSTRUCTION_NAME_ERASE_WINDOW;
+        }
+      break;
       
     case 0xf1: // set_text_style
       if ( mem->sf_mem[0] >= 4 )

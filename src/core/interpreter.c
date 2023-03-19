@@ -3755,6 +3755,14 @@ exec_next_inst (
         }
       break;
 
+    case 0xed: // erase_window
+      if ( intp->version < 4 ) goto wrong_version;
+      if ( !read_var_ops ( intp, ops, &nops, 1, false, err ) ) return RET_ERROR;
+      if ( !op_to_u16 ( intp, &(ops[0]), &op1, err ) ) return false;
+      if ( !screen_erase_window ( intp->screen, (int16_t) op1, err ) )
+        return RET_ERROR;
+      break;
+      
     case 0xf1: // set_text_style
       if ( intp->version < 4 ) goto wrong_version;
       if ( !read_var_ops ( intp, ops, &nops, 1, false, err ) ) return RET_ERROR;

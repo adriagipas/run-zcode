@@ -78,6 +78,7 @@ get_inst_name (
     case INSTRUCTION_NAME_DEC             : return "dec             ";
     case INSTRUCTION_NAME_DEC_CHK         : return "dec_chk         ";
     case INSTRUCTION_NAME_DIV             : return "div             ";
+    case INSTRUCTION_NAME_ERASE_WINDOW    : return "erase_window    ";
     case INSTRUCTION_NAME_GET_PROP        : return "get_prop        ";
     case INSTRUCTION_NAME_GET_PROP_ADDR   : return "get_prop_addr   ";
     case INSTRUCTION_NAME_GET_PROP_LEN    : return "get_prop_len    ";

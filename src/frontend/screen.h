@@ -47,6 +47,8 @@ typedef struct
   // Estil actual
   int       font;
   int       style;
+  uint16_t  set_fg_color;
+  uint16_t  set_bg_color;
   uint16_t  fg_color;
   uint16_t  bg_color;
   
@@ -91,8 +93,6 @@ typedef struct
 
   // Frame buffer
   uint32_t *_fb;
-  uint16_t  _bg_color;
-  uint16_t  _fg_color;
   bool      _reverse_color;
 
   // Finestres i altres.
@@ -187,6 +187,15 @@ void
 screen_undo (
              Screen *screen
              );
+
+// -1 -> Elimina la finestra superior i neteja
+// -2 -> Neteja les dos finestres
+bool
+screen_erase_window (
+                     Screen     *screen,
+                     const int   window,
+                     char      **err
+                     );
 
 #define screen_GET_LINES(SCREEN) ((SCREEN)->_lines)
 #define screen_GET_WIDTH_CHARS(SCREEN) ((SCREEN)->_width_chars)

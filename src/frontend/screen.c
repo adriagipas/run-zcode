@@ -146,7 +146,7 @@ scroll_low (
     fb[i]= fb[j];
 
   // Última línia
-  color= true_color_to_u32 ( s, s->_bg_color );
+  color= true_color_to_u32 ( s, s->_cursors[W_LOW].set_bg_color );
   for ( i= line_size*((size_t) (s->_lines-1)), j= 0;
         j < line_size;
         ++i, ++j )
@@ -646,6 +646,66 @@ set_colour (
 } // end set_colour
 
 
+static void
+unsplit_window (
+                Screen *s
+                )
+{
+
+  s->_cursors[W_UP].x= 0;
+  s->_cursors[W_UP].line= 0;
+  s->_cursors[W_UP].text[0]= '\0';
+  s->_cursors[W_UP].width= 0;
+  s->_cursors[W_UP].N= 0;
+  s->_cursors[W_UP].Nc= 0;
+  s->_upwin_lines= 0;
+  s->_current_win= W_LOW;
+  
+} // end unsplit_window
+
+
+// window - W_UP/W_LOW
+static void
+erase_window (
+              Screen    *s,
+              const int  window
+              )
+{
+
+  int beg,end,r;
+  uint32_t color;
+  uint32_t *fb;
+  size_t i,j,line_size;
+  
+  
+  // Prepara i mou cursor
+  if ( window == W_UP )
+    {
+      beg= 0; end= s->_upwin_lines;
+      s->_cursors[W_UP].line= 0;
+    }
+  else
+    {
+      beg= s->_upwin_lines; end= s->_lines;
+      s->_cursors[W_LOW].line= (s->_version == 4) ? s->_lines-1 : beg;
+    }
+  s->_cursors[window].x= 0;
+  s->_cursors[window].text[0]= '\0';
+  s->_cursors[window].width= 0;
+  s->_cursors[window].N= 0;
+  s->_cursors[window].Nc= 0;
+
+  // Neteja
+  fb= s->_fb;
+  line_size= ((size_t) s->_line_height)*((size_t) s->_width);
+  color= true_color_to_u32 ( s, s->_cursors[window].set_bg_color );
+  for ( i= beg*line_size, r= beg; r != end; ++r )
+    for ( j= 0; j < line_size; ++j, ++i )
+      fb[i]= color;
+  
+} // end erase_window
+
+
 
 
 /**********************/
@@ -753,10 +813,8 @@ screen_new (
 
   // Inicialitza framebuffer
   ret->_fb= g_new ( uint32_t, ret->_width*ret->_height );
-  ret->_bg_color= C_WHITE;
-  ret->_fg_color= C_BLACK;
   ret->_reverse_color= false;
-  color= true_color_to_u32 ( ret, ret->_bg_color );
+  color= true_color_to_u32 ( ret, C_WHITE );
   for ( n= 0; n < ret->_width*ret->_height; ++n )
     ret->_fb[n]= color;
   ret->_last_redraw_t= (Uint32) -1;
@@ -777,6 +835,8 @@ screen_new (
       ret->_cursors[n].style= ret->_current_style;
       ret->_cursors[n].fg_color= C_BLACK;
       ret->_cursors[n].bg_color= C_WHITE;
+      ret->_cursors[n].set_fg_color= C_BLACK;
+      ret->_cursors[n].set_bg_color= C_WHITE;
       ret->_cursors[n].line= 0;
       ret->_cursors[n].x= 0;
       ret->_cursors[n].width= 0;
@@ -839,9 +899,11 @@ screen_print (
   if ( s->_current_win == W_UP ) font= F_FPITCH;
   else font= s->_current_font;
   style= s->_current_style;
-  if ( s->_reverse_color ) { fg_color= s->_bg_color; bg_color= s->_fg_color; }
-  else                     { fg_color= s->_fg_color; bg_color= s->_bg_color; }
   c= &(s->_cursors[s->_current_win]);
+  if ( s->_reverse_color )
+    { fg_color= c->set_bg_color; bg_color= c->set_fg_color; }
+  else
+    { fg_color= c->set_fg_color; bg_color= c->set_bg_color; }
   
   // Adelanta el cursos si canvia l'estil.
   if ( c->bg_color != bg_color || c->fg_color != fg_color ||
@@ -919,8 +981,12 @@ screen_set_colour (
                    )
 {
   
-  set_colour ( screen, fg, &screen->_fg_color, C_BLACK );
-  set_colour ( screen, bg, &screen->_bg_color, C_WHITE );
+  set_colour ( screen, fg,
+               &screen->_cursors[screen->_current_win].set_fg_color,
+               C_BLACK );
+  set_colour ( screen, bg,
+               &screen->_cursors[screen->_current_win].set_bg_color,
+               C_WHITE );
   
 } // end screen_set_colour
 
@@ -1014,3 +1080,35 @@ screen_undo (
   c->space= screen->_undo.cursor.space;
   
 } // end screen_undo
+
+
+bool
+screen_erase_window (
+                     Screen     *screen,
+                     const int   window,
+                     char      **err
+                     )
+{
+
+  // Neteja
+  if ( window == -2 ) // Neteja les dos finestres
+    {
+      erase_window ( screen, W_UP );
+      erase_window ( screen, W_LOW );
+    }
+  else if ( window == -1 ) // Unsplit i neteja
+    {
+      unsplit_window ( screen );
+      erase_window ( screen, W_LOW );
+    }
+  else if ( window == W_UP || window == W_LOW )
+    erase_window ( screen, window );
+  else
+    ww ( "Cannot erase window %d because it not exist", window );
+
+  // Redibuixa
+  if ( !redraw_fb ( screen, err ) ) return false;
+
+  return true;
+  
+} // end screen_erase_window
