@@ -208,6 +208,7 @@ int main ( int argc, char *argv[] )
   if ( conf != NULL ) conf_free ( conf );
   if ( intp != NULL ) interpreter_free ( intp );
   free_opts ( &opts );
+  SDL_Quit ();
   return EXIT_FAILURE;
   
 }
