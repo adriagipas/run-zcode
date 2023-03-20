@@ -895,7 +895,7 @@ branch (
       // 14bits amb signe
       offset= (((uint32_t) (b1&0x3F))<<8) | ((uint32_t) b2);
       if ( offset&0x2000 )
-        offset= ((uint32_t) -((int32_t) offset));
+        offset= (uint32_t) -((int32_t) (16384 - offset));
     }
   else offset= (uint32_t) (b1&0x3F);
   cond_value= ((b1&0x80)!=0); // True si bit7 està actiu.
@@ -1407,6 +1407,7 @@ zscii_char2utf8 (
 } // end zscii_char2utf8
 
 
+// La longitut es mesura en paraules, i un -1 vol dir ignorar. No pot ser 0.
 static bool
 zscii2utf8 (
             Interpreter     *intp,
@@ -1414,6 +1415,7 @@ zscii2utf8 (
             uint32_t        *ret_addr, // Pot ser NULL
             const bool       hmem_allowed,
             const bool       is_abbr,
+            int              length, // -1 Ignorar.
             char           **err
             )
 {
@@ -1429,6 +1431,8 @@ zscii2utf8 (
     WAIT_ZSCII_LOW
   } mode;
   
+
+  assert ( length == -1 || length > 0 );
   
   prev_alph= alph= 0;
   if ( !is_abbr ) intp->text.N= 0;
@@ -1442,6 +1446,7 @@ zscii2utf8 (
     if ( !memory_map_READW ( intp->mem, caddr, &word, hmem_allowed, err ) )
       return false;
     caddr+= 2;
+    if ( length > 0 ) --length;
     
     // Descodifica
     end= (word&0x8000)!=0;
@@ -1528,7 +1533,7 @@ zscii2utf8 (
                                      false, err ) )
               return false;
             if ( !zscii2utf8 ( intp, ((uint32_t) abbr_addr)<<1, NULL,
-                               false, true, err ) )
+                               false, true, -1, err ) )
               return false;
             abbr_ind= 0;
           }
@@ -1536,21 +1541,21 @@ zscii2utf8 (
         // Valors
         else
           {
-            if ( intp->alphabet_table_addr != 0x00 )
-              ee ( "CAL IMPLEMENTAR ALPHABET_TABLE " );
+            if ( zc == 6 && alph == 2 ) mode= WAIT_ZSCII_TOP;
+            else if ( intp->alph_table.enabled  )
+              {
+                zscii= (uint16_t) intp->alph_table.v[alph][zc-6];
+                if ( !zscii_char2utf8 ( intp, zscii, err ) ) return false;
+              }
+            else if ( intp->version == 1 )
+              {
+                if ( !text_add ( intp, ZSCII_ENC_V1[alph][zc-6], err ) )
+                  return false;
+              }
             else
               {
-                if ( zc == 6 && alph == 2 ) mode= WAIT_ZSCII_TOP;
-                else if ( intp->version == 1 )
-                  {
-                    if ( !text_add ( intp, ZSCII_ENC_V1[alph][zc-6], err ) )
-                      return false;
-                  }
-                else
-                  {
-                    if ( !text_add ( intp, ZSCII_ENC[alph][zc-6], err ) )
-                      return false;
-                  }
+                if ( !text_add ( intp, ZSCII_ENC[alph][zc-6], err ) )
+                  return false;
               }
             alph= prev_alph;
           }
@@ -1558,7 +1563,7 @@ zscii2utf8 (
         word<<= 5;
       }
     
-  } while ( !end );
+  } while ( !end && length != 0 );
   if ( !is_abbr ) if ( !text_add ( intp, '\0', err ) ) return false;
   if ( ret_addr != NULL ) *ret_addr= caddr;
   
@@ -1812,7 +1817,7 @@ print_addr (
             )
 {
 
-  if ( !zscii2utf8 ( intp, addr, ret_addr, hmem_allowed, false, err ) )
+  if ( !zscii2utf8 ( intp, addr, ret_addr, hmem_allowed, false, -1, err ) )
     return false;
   if ( !print_output ( intp, intp->text.v, false, err ) )
     return false;
@@ -1837,6 +1842,49 @@ print_paddr (
   return print_addr ( intp, addr, NULL, true, err );
   
 } // end print_paddr
+
+
+static bool
+print_obj (
+           Interpreter     *intp,
+           const uint16_t   object,
+           char           **err
+           )
+{
+
+  uint32_t property_pointer_offset;
+  uint16_t property_pointer,offset;
+  uint8_t text_length;
+  int length;
+  
+
+  // Obté property pointer
+  if ( !get_object_offset ( intp, object, &property_pointer_offset, err ) )
+    return false;
+  property_pointer_offset+= (intp->version <= 3) ? 7 : 12;
+  if ( !memory_map_READW ( intp->mem, property_pointer_offset,
+                           &property_pointer, false, err ) )
+    return false;
+  
+  // Llig grandària text i adreça text.
+  if ( !memory_map_READB ( intp->mem, property_pointer,
+                           &text_length, false, err ) )
+    return false;
+  offset= property_pointer + 1;
+  length= (int) ((uint16_t) text_length);
+
+  // Imprimeix si hi ha alguna cosa que imprimir.
+  if ( length > 0 )
+    {
+      if ( !zscii2utf8 ( intp, offset, NULL, true, false, length, err ) )
+        return false;
+      if ( !print_output ( intp, intp->text.v, false, err ) )
+        return false;
+    }
+
+  return true;
+
+} // end print_obj
 
 
 static bool
@@ -3249,7 +3297,13 @@ exec_next_inst (
       if ( !call_routine ( intp, ops, 1, result_var, false, err ) )
         return RET_ERROR;
       break;
-      
+
+    case 0x8a: // print_obj
+      if ( !memory_map_READW ( intp->mem, state->PC, &op1, true, err ) )
+        return RET_ERROR;
+      state->PC+= 2;
+      if ( !print_obj ( intp, op1, err ) ) return RET_ERROR;
+      break;
     case 0x8b: // ret
       if ( !memory_map_READW ( intp->mem, state->PC, &op1, true, err ) )
         return RET_ERROR;
@@ -3331,7 +3385,13 @@ exec_next_inst (
       if ( !call_routine ( intp, ops, 1, result_var, false, err ) )
         return RET_ERROR;
       break;
-      
+
+    case 0x9a: // print_obj
+      if ( !memory_map_READB ( intp->mem, state->PC++, &op1_u8, true, err ) )
+        return RET_ERROR;
+      SET_U8TOU16(op1_u8,op1);
+      if ( !print_obj ( intp, op1, err ) ) return RET_ERROR;
+      break;
     case 0x9b: // ret
       if ( !memory_map_READB ( intp->mem, state->PC++, &op1_u8, true, err ) )
         return RET_ERROR;
@@ -3413,7 +3473,11 @@ exec_next_inst (
       if ( !call_routine ( intp, ops, 1, result_var, false, err ) )
         return RET_ERROR;
       break;
-      
+
+    case 0xaa: // print_obj
+      if ( !read_op1_var ( intp, &op1, err ) ) return RET_ERROR;
+      if ( !print_obj ( intp, op1, err ) ) return RET_ERROR;
+      break;
     case 0xab: // ret
       if ( !read_op1_var ( intp, &op1, err ) ) return RET_ERROR;
       if ( !ret_val ( intp, op1, err ) ) return RET_ERROR;
@@ -3754,13 +3818,47 @@ exec_next_inst (
           if ( !write_var ( intp, op1_u8, op1, err ) ) return RET_ERROR;
         }
       break;
+    case 0xea: // split_window
+      if ( intp->version < 3 ) goto wrong_version;
+      if ( !read_var_ops ( intp, ops, &nops, 1, false, err ) ) return RET_ERROR;
+      if ( !op_to_u16 ( intp, &(ops[0]), &op1, err ) ) return RET_ERROR;
+      if ( !screen_split_window ( intp->screen, (int16_t) op1, err ) )
+        return RET_ERROR;
+      break;
+    case 0xeb: // set_window
+      if ( intp->version < 3 ) goto wrong_version;
+      if ( !read_var_ops ( intp, ops, &nops, 1, false, err ) ) return RET_ERROR;
+      if ( !op_to_u16 ( intp, &(ops[0]), &op1, err ) ) return RET_ERROR;
+      if ( !screen_set_window ( intp->screen, (int16_t) op1, err ) )
+        return RET_ERROR;
+      break;
 
     case 0xed: // erase_window
       if ( intp->version < 4 ) goto wrong_version;
       if ( !read_var_ops ( intp, ops, &nops, 1, false, err ) ) return RET_ERROR;
-      if ( !op_to_u16 ( intp, &(ops[0]), &op1, err ) ) return false;
+      if ( !op_to_u16 ( intp, &(ops[0]), &op1, err ) ) return RET_ERROR;
       if ( !screen_erase_window ( intp->screen, (int16_t) op1, err ) )
         return RET_ERROR;
+      break;
+
+    case 0xef: // set_cursor
+      if ( intp->version < 4 ) goto wrong_version;
+      if ( intp->version == 6 )
+        {
+          msgerror ( err, "set_cursor not implemented in version 6" );
+          return RET_ERROR;
+        }
+      else
+        {
+          if ( !read_var_ops ( intp, ops, &nops, 2, false, err ) )
+            return RET_ERROR;
+          if ( !op_to_u16 ( intp, &(ops[0]), &op1, err ) ) return RET_ERROR;
+          if ( !op_to_u16 ( intp, &(ops[1]), &op2, err ) ) return RET_ERROR;
+          // line column --> x,y (CAL INTERCANVIAR)
+          if ( !screen_set_cursor ( intp->screen, (int16_t) op2,
+                                    (int16_t) op1, err ) )
+            return RET_ERROR;
+        }
       break;
       
     case 0xf1: // set_text_style
@@ -3769,7 +3867,12 @@ exec_next_inst (
       if ( !op_to_u16 ( intp, &(ops[0]), &op1, err ) ) return RET_ERROR;
       screen_set_style ( intp->screen, op1 );
       break;
-
+    case 0xf2: // buffered_mode
+      if ( intp->version < 4 ) goto wrong_version;
+      if ( !read_var_ops ( intp, ops, &nops, 1, false, err ) ) return RET_ERROR;
+      if ( !op_to_u16 ( intp, &(ops[0]), &op1, err ) ) return RET_ERROR;
+      screen_set_buffered ( intp->screen, op1!=0 );
+      break;
     case 0xf3: // output_stream
       if ( intp->version < 3 ) goto wrong_version;
       if ( !read_var_ops ( intp, ops, &nops, -1,
@@ -3791,9 +3894,9 @@ exec_next_inst (
       if ( !read_var_ops_store ( intp, ops, &nops, 1,
                                  false, &result_var, err ) )
         return RET_ERROR;
-      if ( !op_to_u16 ( intp, &(ops[0]), &op1, err ) ) return false;
+      if ( !op_to_u16 ( intp, &(ops[0]), &op1, err ) ) return RET_ERROR;
       res= ~op1;
-      if ( !write_var ( intp, result_var, res, err ) ) return false;
+      if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
       break;
     case 0xf9: // call_vn
       if ( intp->version < 5 ) goto wrong_version;
@@ -3925,6 +4028,32 @@ load_header_extension_table (
 } // end load_header_extension_table
 
 
+static bool
+load_alphabet_table (
+                     Interpreter  *intp,
+                     uint32_t      addr,
+                     char        **err
+                     )
+{
+
+  int i,j;
+
+  
+  assert ( addr != 0 );
+  intp->alph_table.enabled= true;
+  for ( i= 0; i < 3; ++i )
+    for ( j= 0; j < 26; ++j, ++addr )
+      if ( !memory_map_READB ( intp->mem, addr,
+                               &(intp->alph_table.v[i][j]),
+                               true, err ) )
+        return false;
+  intp->alph_table.v[2][1]= ZSCII_NEWLINE;
+  
+  return true;
+  
+} // end load_alphabet_table
+
+
 
 
 /**********************/
@@ -3963,7 +4092,7 @@ interpreter_new_from_file_name (
 {
 
   Interpreter *ret;
-  uint32_t std_dict_addr;
+  uint32_t std_dict_addr,alphabet_table_addr;
   
   
   // Prepara.
@@ -3980,6 +4109,7 @@ interpreter_new_from_file_name (
   ret->usr_dict= NULL;
   ret->saves= NULL;
   ret->verbose= verbose;
+  ret->alph_table.enabled= false;
   
   // Obri story file
   ret->sf= story_file_new_from_file_name ( file_name, err );
@@ -4025,12 +4155,12 @@ interpreter_new_from_file_name (
     ;
   if ( ret->version >= 5 )
     {
-      ret->alphabet_table_addr=
+      alphabet_table_addr=
         (((uint32_t) ret->mem->sf_mem[0x34])<<8) |
         ((uint32_t) ret->mem->sf_mem[0x35])
         ;
     }
-  else ret->alphabet_table_addr= 0;
+  else alphabet_table_addr= 0;
   if ( ret->version >= 2 )
     {
       ret->abbr_table_addr=
@@ -4066,6 +4196,12 @@ interpreter_new_from_file_name (
 
   // Header extension table
   if ( !load_header_extension_table ( ret, err ) ) goto error;
+
+  // Alphabet table addr
+  if ( alphabet_table_addr != 0 )
+    {
+      if ( !load_alphabet_table ( ret, alphabet_table_addr, err ) ) goto error;
+    }
   
   return ret;
   

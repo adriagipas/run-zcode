@@ -68,7 +68,6 @@ typedef struct
   uint32_t routine_offset;
   uint32_t static_strings_offset;
   uint32_t object_table_offset;
-  uint32_t alphabet_table_addr;
   uint32_t abbr_table_addr;
   struct
   {
@@ -102,6 +101,13 @@ typedef struct
     uint8_t  N;
     uint16_t v[256];
   } echars;
+
+  // Alphabet table
+  struct
+  {
+    bool    enabled;
+    uint8_t v[3][26];
+  } alph_table;
   
 } Interpreter;
 

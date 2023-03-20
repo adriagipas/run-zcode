@@ -71,6 +71,7 @@ get_inst_name (
     case INSTRUCTION_NAME_ADD             : return "add             ";
     case INSTRUCTION_NAME_AND             : return "and             ";
     case INSTRUCTION_NAME_ART_SHIFT       : return "art_shift       ";
+    case INSTRUCTION_NAME_BUFFER_MODE     : return "buffer_mode     ";
     case INSTRUCTION_NAME_CALL            : return "call            ";
     case INSTRUCTION_NAME_CATCH           : return "catch           ";
     case INSTRUCTION_NAME_CHECK_ARG_COUNT : return "check_arg_count ";
@@ -104,6 +105,7 @@ get_inst_name (
     case INSTRUCTION_NAME_PRINT_ADDR      : return "print_addr      ";
     case INSTRUCTION_NAME_PRINT_CHAR      : return "print_char      ";
     case INSTRUCTION_NAME_PRINT_NUM       : return "print_num       ";
+    case INSTRUCTION_NAME_PRINT_OBJ       : return "print_obj       ";
     case INSTRUCTION_NAME_PRINT_PADDR     : return "print_paddr     ";
     case INSTRUCTION_NAME_PRINT_RET       : return "print_ret       ";
     case INSTRUCTION_NAME_PRINT_TABLE     : return "print_table     ";
@@ -120,8 +122,11 @@ get_inst_name (
     case INSTRUCTION_NAME_SAVE_UNDO       : return "save_undo       ";
     case INSTRUCTION_NAME_SCAN_TABLE      : return "scan_table      ";
     case INSTRUCTION_NAME_SET_COLOUR      : return "set_colour      ";
+    case INSTRUCTION_NAME_SET_CURSOR      : return "set_cursor      ";
     case INSTRUCTION_NAME_SET_TEXT_STYLE  : return "set_text_style  ";
     case INSTRUCTION_NAME_SET_TRUE_COLOUR : return "set_true_colour ";
+    case INSTRUCTION_NAME_SET_WINDOW      : return "set_window      ";
+    case INSTRUCTION_NAME_SPLIT_WINDOW    : return "split_window    ";
     case INSTRUCTION_NAME_STORE           : return "store           ";
     case INSTRUCTION_NAME_STOREB          : return "storeb          ";
     case INSTRUCTION_NAME_STOREW          : return "storew          ";

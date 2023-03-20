@@ -197,6 +197,34 @@ screen_erase_window (
                      char      **err
                      );
 
+bool
+screen_split_window (
+                     Screen     *screen,
+                     const int   lines,
+                     char      **err
+                     );
+
+void
+screen_set_buffered (
+                     Screen     *screen,
+                     const bool  value
+                     );
+
+bool
+screen_set_window (
+                   Screen     *screen,
+                   const int   window,
+                   char      **err
+                   );
+
+bool
+screen_set_cursor (
+                   Screen     *screen,
+                   const int   x,
+                   const int   y,
+                   char      **err
+                   );
+
 #define screen_GET_LINES(SCREEN) ((SCREEN)->_lines)
 #define screen_GET_WIDTH_CHARS(SCREEN) ((SCREEN)->_width_chars)
 

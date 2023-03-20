@@ -647,17 +647,32 @@ set_colour (
 
 
 static void
+reset_cursor (
+              Screen    *s,
+              const int  window
+              )
+{
+
+  if ( window == W_LOW )
+    s->_cursors[W_LOW].line= (s->_version==4) ? s->_lines-1 : s->_upwin_lines;
+  else
+    s->_cursors[W_UP].line= 0;
+  s->_cursors[window].x= 0;
+  s->_cursors[window].text[0]= '\0';
+  s->_cursors[window].width= 0;
+  s->_cursors[window].N= 0;
+  s->_cursors[window].Nc= 0;
+  
+} // end reset_cursor
+
+
+static void
 unsplit_window (
                 Screen *s
                 )
 {
 
-  s->_cursors[W_UP].x= 0;
-  s->_cursors[W_UP].line= 0;
-  s->_cursors[W_UP].text[0]= '\0';
-  s->_cursors[W_UP].width= 0;
-  s->_cursors[W_UP].N= 0;
-  s->_cursors[W_UP].Nc= 0;
+  reset_cursor ( s, W_UP );
   s->_upwin_lines= 0;
   s->_current_win= W_LOW;
   
@@ -1112,3 +1127,113 @@ screen_erase_window (
   return true;
   
 } // end screen_erase_window
+
+
+bool
+screen_split_window (
+                     Screen     *screen,
+                     const int   lines,
+                     char      **err
+                     )
+{
+
+  // Teòricament sols es pot splitejar si window == W_LOW, però com en
+  // realitat no està definit què fer quan window == W_UP i la
+  // documentació continua fer el mateix vaig a ignorar-ho.
+
+  // Cas especial on fa un unsplit
+  if ( lines == 0 )
+    {
+      unsplit_window ( screen );
+      return true;
+    }
+  
+  // Spliteja
+  if ( lines < 0 || lines-1 > screen->_lines )
+    {
+      msgerror ( err,
+                 "Failed to split window: wrong number of lines (%d)"
+                 " for upper window", lines );
+      return false;
+    }
+  screen->_upwin_lines= lines;
+
+  // Mou cursors si cal
+  if ( screen->_cursors[W_UP].line >= screen->_upwin_lines )
+    reset_cursor ( screen, W_UP );
+  if ( screen->_cursors[W_LOW].line < screen->_upwin_lines )
+    reset_cursor ( screen, W_LOW );
+  
+  // Si estem en la versió 3 erase_window up
+  if ( screen->_version == 3 ) erase_window ( screen, W_UP );
+  
+  return true;
+  
+} // end screen_split_window
+
+
+void
+screen_set_buffered (
+                     Screen     *screen,
+                     const bool  value
+                     )
+{
+  screen->_cursors[W_LOW].buffered= value;
+} // end screen_set_buffered
+
+
+bool
+screen_set_window (
+                   Screen     *screen,
+                   const int   window,
+                   char      **err
+                   )
+{
+
+  if ( window == W_UP || window == W_LOW )
+    screen->_current_win= window;
+  else
+    {
+      msgerror ( err, "Failed to execute set_window: unknown window %d",
+                 window );
+      return false;
+    }
+  
+  return true;
+  
+} // end screen_set_window
+
+
+bool
+screen_set_cursor (
+                   Screen     *screen,
+                   const int   x,
+                   const int   y,
+                   char      **err
+                   )
+{
+
+  // Comprovacions
+  if ( screen->_current_win == W_LOW )
+    {
+      msgerror ( err, "Failed to execute set_cursor: lower window"
+                 " does not support this function" );
+      return false;
+    }
+  if ( x < 1 || x > screen->_width_chars ||
+       y < 1 || y > screen->_upwin_lines )
+    {
+      msgerror ( err,
+                 "Failed to execute set_cursor: invalid position (%d,%d)",
+                 x, y );
+      return false;
+    }
+  
+  // Fixa cursor.
+  reset_cursor ( screen, W_UP );
+  screen->_cursors[W_UP].x= (x-1)*screen->_char_width;
+  screen->_cursors[W_UP].line= y-1;
+  
+  return true;
+  
+} // end screen_set_cursor

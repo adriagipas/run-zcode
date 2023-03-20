@@ -117,7 +117,7 @@ read_var_ops (
   // Llig tipus
   if ( !memory_map_READB ( mem, *addr, &ops_type, true, err ) )
     return false;
-  ++(*addr);
+  ++(*addr); 
   ins->bytes[ins->nbytes++]= ops_type;
 
   // Processa tipus
@@ -255,7 +255,8 @@ read_branch (
       ins->bytes[ins->nbytes++]= b2;
       ins->branch_op.u32= (((uint32_t) (b1&0x3F))<<8) | ((uint32_t) b2);
       if ( ins->branch_op.u32&0x2000 )
-        ins->branch_op.u32= ((uint32_t) -((int32_t) ins->branch_op.u32));
+        ins->branch_op.u32=
+          (uint32_t) -((int32_t) (16384 - ins->branch_op.u32));
     }
   else ins->branch_op.u32= (uint32_t) (b1&0x3F);
   cond_value= ((b1&0x80)!=0); // True si bit7 està actiu.
@@ -456,8 +457,8 @@ ins_1op (
                                true, err ) )
         return false;
       ++(*addr);
-      set_variable_type ( &(ins->ops[ins->nops]) );
       ins->bytes[ins->nbytes++]= (uint8_t) ins->ops[ins->nops].u8;
+      set_variable_type ( &(ins->ops[ins->nops]) );
       ++(ins->nops);
       break;
     default:
@@ -1117,6 +1118,10 @@ decode_next_inst (
         }
       break;
 
+    case 0x8a: // print_obj
+      if ( !ins_1op ( ins, mem, &addr, INSTRUCTION_NAME_PRINT_OBJ, err ) )
+        return false;
+      break;
     case 0x8b: // ret
       if ( !ins_1op ( ins, mem, &addr, INSTRUCTION_NAME_RET, err ) )
         return false;
@@ -1176,7 +1181,11 @@ decode_next_inst (
             return false;
         }
       break;
-      
+
+    case 0x9a: // print_obj
+      if ( !ins_1op ( ins, mem, &addr, INSTRUCTION_NAME_PRINT_OBJ, err ) )
+        return false;
+      break;
     case 0x9b: // ret
       if ( !ins_1op ( ins, mem, &addr, INSTRUCTION_NAME_RET, err ) )
         return false;
@@ -1236,7 +1245,11 @@ decode_next_inst (
             return false;
         }
       break;
-      
+
+    case 0xaa: // print_obj
+      if ( !ins_1op ( ins, mem, &addr, INSTRUCTION_NAME_PRINT_OBJ, err ) )
+        return false;
+      break;
     case 0xab: // ret
       if ( !ins_1op ( ins, mem, &addr, INSTRUCTION_NAME_RET, err ) )
         return false;
@@ -1438,12 +1451,34 @@ decode_next_inst (
           ins->name= INSTRUCTION_NAME_PULL;
         }
       break;
+    case 0xea: // split_window
+      if ( mem->sf_mem[0] >= 3 )
+        {
+          if ( !read_var_ops ( ins, mem, &addr, false, err ) ) return false;
+          ins->name= INSTRUCTION_NAME_SPLIT_WINDOW;
+        }
+      break;
+    case 0xeb: // set_window
+      if ( mem->sf_mem[0] >= 3 )
+        {
+          if ( !read_var_ops ( ins, mem, &addr, false, err ) ) return false;
+          ins->name= INSTRUCTION_NAME_SET_WINDOW;
+        }
+      break;
 
     case 0xed: // erase_window
       if ( mem->sf_mem[0] >= 4 )
         {
           if ( !read_var_ops ( ins, mem, &addr, false, err ) ) return false;
           ins->name= INSTRUCTION_NAME_ERASE_WINDOW;
+        }
+      break;
+
+    case 0xef: // set_cursor
+      if ( mem->sf_mem[0] >= 4 )
+        {
+          if ( !read_var_ops ( ins, mem, &addr, false, err ) ) return false;
+          ins->name= INSTRUCTION_NAME_SET_CURSOR;
         }
       break;
       
@@ -1455,7 +1490,14 @@ decode_next_inst (
             return false;
         }
       break;
-      
+    case 0xf2: // buffer_mode
+      if ( mem->sf_mem[0] >= 4 )
+        {
+          if ( !read_var_ops ( ins, mem, &addr, false, err ) ) return false;
+          if ( !ins_var_1op ( ins, INSTRUCTION_NAME_BUFFER_MODE, err ) )
+            return false;
+        }
+      break;
     case 0xf3: // output_stream
       if ( mem->sf_mem[0] >= 3 )
         {
