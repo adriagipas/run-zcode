@@ -75,11 +75,13 @@ get_inst_name (
     case INSTRUCTION_NAME_CALL            : return "call            ";
     case INSTRUCTION_NAME_CATCH           : return "catch           ";
     case INSTRUCTION_NAME_CHECK_ARG_COUNT : return "check_arg_count ";
+    case INSTRUCTION_NAME_CLEAR_ATTR      : return "clear_attr      ";
     case INSTRUCTION_NAME_COPY_TABLE      : return "copy_table      ";
     case INSTRUCTION_NAME_DEC             : return "dec             ";
     case INSTRUCTION_NAME_DEC_CHK         : return "dec_chk         ";
     case INSTRUCTION_NAME_DIV             : return "div             ";
     case INSTRUCTION_NAME_ERASE_WINDOW    : return "erase_window    ";
+    case INSTRUCTION_NAME_GET_PARENT      : return "get_parent      ";
     case INSTRUCTION_NAME_GET_PROP        : return "get_prop        ";
     case INSTRUCTION_NAME_GET_PROP_ADDR   : return "get_prop_addr   ";
     case INSTRUCTION_NAME_GET_PROP_LEN    : return "get_prop_len    ";
@@ -114,6 +116,7 @@ get_inst_name (
     case INSTRUCTION_NAME_PUT_PROP        : return "put_prop        ";
     case INSTRUCTION_NAME_QUIT            : return "quit            ";
     case INSTRUCTION_NAME_READ            : return "read            ";
+    case INSTRUCTION_NAME_READ_CHAR       : return "read_char       ";
     case INSTRUCTION_NAME_RESTORE_UNDO    : return "restore_undo    ";
     case INSTRUCTION_NAME_RET             : return "ret             ";
     case INSTRUCTION_NAME_RET_POPPED      : return "ret_popped      ";
@@ -121,6 +124,7 @@ get_inst_name (
     case INSTRUCTION_NAME_RTRUE           : return "rtrue           ";
     case INSTRUCTION_NAME_SAVE_UNDO       : return "save_undo       ";
     case INSTRUCTION_NAME_SCAN_TABLE      : return "scan_table      ";
+    case INSTRUCTION_NAME_SET_ATTR        : return "set_attr        ";
     case INSTRUCTION_NAME_SET_COLOUR      : return "set_colour      ";
     case INSTRUCTION_NAME_SET_CURSOR      : return "set_cursor      ";
     case INSTRUCTION_NAME_SET_TEXT_STYLE  : return "set_text_style  ";

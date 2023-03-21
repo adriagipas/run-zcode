@@ -722,7 +722,14 @@ decode_next_inst (
                              INSTRUCTION_NAME_TEST_ATTR, err ) )
         return false;
       break;
-      
+    case 0x0b: // set_attr
+      if ( !ins_2op ( ins, mem, &addr, INSTRUCTION_NAME_SET_ATTR, err ) )
+        return false;
+      break;
+    case 0x0c: // clear_attr
+      if ( !ins_2op ( ins, mem, &addr, INSTRUCTION_NAME_CLEAR_ATTR, err ) )
+        return false;
+      break;
     case 0x0d: // store
       if ( !ins_2op ( ins, mem, &addr, INSTRUCTION_NAME_STORE, err ) )
         return false;
@@ -823,7 +830,14 @@ decode_next_inst (
                              INSTRUCTION_NAME_TEST_ATTR, err ) )
         return false;
       break;
-      
+    case 0x2b: // set_attr
+      if ( !ins_2op ( ins, mem, &addr, INSTRUCTION_NAME_SET_ATTR, err ) )
+        return false;
+      break;
+    case 0x2c: // clear_attr
+      if ( !ins_2op ( ins, mem, &addr, INSTRUCTION_NAME_CLEAR_ATTR, err ) )
+        return false;
+      break;
     case 0x2d: // store
       if ( !ins_2op ( ins, mem, &addr, INSTRUCTION_NAME_STORE, err ) )
         return false;
@@ -924,7 +938,14 @@ decode_next_inst (
                              INSTRUCTION_NAME_TEST_ATTR, err ) )
         return false;
       break;
-      
+    case 0x4b: // set_attr
+      if ( !ins_2op ( ins, mem, &addr, INSTRUCTION_NAME_SET_ATTR, err ) )
+        return false;
+      break;
+    case 0x4c: // clear_attr
+      if ( !ins_2op ( ins, mem, &addr, INSTRUCTION_NAME_CLEAR_ATTR, err ) )
+        return false;
+      break;
     case 0x4d: // store
       if ( !ins_2op ( ins, mem, &addr, INSTRUCTION_NAME_STORE, err ) )
         return false;
@@ -1025,7 +1046,14 @@ decode_next_inst (
                              INSTRUCTION_NAME_TEST_ATTR, err ) )
         return false;
       break;
-      
+    case 0x6b: // set_attr
+      if ( !ins_2op ( ins, mem, &addr, INSTRUCTION_NAME_SET_ATTR, err ) )
+        return false;
+      break;
+    case 0x6c: // clear_attr
+      if ( !ins_2op ( ins, mem, &addr, INSTRUCTION_NAME_CLEAR_ATTR, err ) )
+        return false;
+      break;
     case 0x6d: // store
       if ( !ins_2op ( ins, mem, &addr, INSTRUCTION_NAME_STORE, err ) )
         return false;
@@ -1091,6 +1119,11 @@ decode_next_inst (
         return false;
       break;
 
+    case 0x83: // get_parent
+      if ( !ins_1op_store ( ins, mem, &addr,
+                            INSTRUCTION_NAME_GET_PARENT, err ) )
+        return false;
+      break;
     case 0x84: // get_prop_len
       if ( !ins_1op_store ( ins, mem, &addr,
                             INSTRUCTION_NAME_GET_PROP_LEN, err ) )
@@ -1155,6 +1188,11 @@ decode_next_inst (
         return false;
       break;
 
+    case 0x93: // get_parent
+      if ( !ins_1op_store ( ins, mem, &addr,
+                            INSTRUCTION_NAME_GET_PARENT, err ) )
+        return false;
+      break;
     case 0x94: // get_prop_len
       if ( !ins_1op_store ( ins, mem, &addr,
                             INSTRUCTION_NAME_GET_PROP_LEN, err ) )
@@ -1219,6 +1257,11 @@ decode_next_inst (
         return false;
       break;
 
+    case 0xa3: // get_parent
+      if ( !ins_1op_store ( ins, mem, &addr,
+                            INSTRUCTION_NAME_GET_PARENT, err ) )
+        return false;
+      break;
     case 0xa4: // get_prop_len
       if ( !ins_1op_store ( ins, mem, &addr,
                             INSTRUCTION_NAME_GET_PROP_LEN, err ) )
@@ -1506,6 +1549,14 @@ decode_next_inst (
         }
       break;
 
+    case 0xf6: // read_char
+      if ( mem->sf_mem[0] >= 4 )
+        {
+          if ( !read_var_ops_store ( ins, mem, &addr, false, err ) )
+            return false;
+          ins->name= INSTRUCTION_NAME_READ_CHAR;
+        }
+      break;
     case 0xf7: // scan_table
       if ( mem->sf_mem[0] >= 4 )
         {
