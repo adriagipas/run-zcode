@@ -551,13 +551,8 @@ ins_call (
                  " routine argument" );
       return false;
     }
-  if ( ins->ops[0].type != INSTRUCTION_OP_TYPE_LARGE_CONSTANT )
-    {
-      msgerror ( err, "Failed to disassemble call instruction: "
-                 "invalid operand type for routine argument" );
-      return false;
-    }
-  set_routine_type ( ins, mem, 0 );
+  if ( ins->ops[0].type == INSTRUCTION_OP_TYPE_LARGE_CONSTANT )
+    set_routine_type ( ins, mem, 0 );
   ins->name= INSTRUCTION_NAME_CALL;
   
   return true;
@@ -735,7 +730,10 @@ decode_next_inst (
         return false;
       if ( !op_to_ref ( ins, 0, err ) ) return false;
       break;
-
+    case 0x0e: // insert_obj
+      if ( !ins_2op ( ins, mem, &addr, INSTRUCTION_NAME_INSERT_OBJ, err ) )
+        return false;
+      break;
     case 0x0f: // loadw
       if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_LOADW, err ) )
         return false;
@@ -843,7 +841,10 @@ decode_next_inst (
         return false;
       if ( !op_to_ref ( ins, 0, err ) ) return false;
       break;
-      
+    case 0x2e: // insert_obj
+      if ( !ins_2op ( ins, mem, &addr, INSTRUCTION_NAME_INSERT_OBJ, err ) )
+        return false;
+      break;
     case 0x2f: // loadw
       if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_LOADW, err ) )
         return false;
@@ -951,7 +952,10 @@ decode_next_inst (
         return false;
       if ( !op_to_ref ( ins, 0, err ) ) return false;
       break;
-      
+    case 0x4e: // insert_obj
+      if ( !ins_2op ( ins, mem, &addr, INSTRUCTION_NAME_INSERT_OBJ, err ) )
+        return false;
+      break;
     case 0x4f: // loadw
       if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_LOADW, err ) )
         return false;
@@ -1059,7 +1063,10 @@ decode_next_inst (
         return false;
       if ( !op_to_ref ( ins, 0, err ) ) return false;
       break;
-      
+    case 0x6e: // insert_obj
+      if ( !ins_2op ( ins, mem, &addr, INSTRUCTION_NAME_INSERT_OBJ, err ) )
+        return false;
+      break;
     case 0x6f: // loadw
       if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_LOADW, err ) )
         return false;
@@ -1118,7 +1125,18 @@ decode_next_inst (
       if ( !ins_1op_branch ( ins, mem, &addr, INSTRUCTION_NAME_JZ, err ) )
         return false;
       break;
-
+    case 0x81: // get_sibling
+      if ( !ins_1op_store ( ins, mem, &addr,
+                            INSTRUCTION_NAME_GET_SIBLING, err ) )
+        return false;
+      if ( !read_branch ( ins, mem, &addr, err ) ) return false;
+      break;
+    case 0x82: // get_child
+      if ( !ins_1op_store ( ins, mem, &addr,
+                            INSTRUCTION_NAME_GET_CHILD, err ) )
+        return false;
+      if ( !read_branch ( ins, mem, &addr, err ) ) return false;
+      break;
     case 0x83: // get_parent
       if ( !ins_1op_store ( ins, mem, &addr,
                             INSTRUCTION_NAME_GET_PARENT, err ) )
@@ -1150,7 +1168,10 @@ decode_next_inst (
             return false;
         }
       break;
-
+    case 0x89: // remove_obj
+      if ( !ins_1op ( ins, mem, &addr, INSTRUCTION_NAME_REMOVE_OBJ, err ) )
+        return false;
+      break;
     case 0x8a: // print_obj
       if ( !ins_1op ( ins, mem, &addr, INSTRUCTION_NAME_PRINT_OBJ, err ) )
         return false;
@@ -1187,7 +1208,18 @@ decode_next_inst (
       if ( !ins_1op_branch ( ins, mem, &addr, INSTRUCTION_NAME_JZ, err ) )
         return false;
       break;
-
+    case 0x91: // get_sibling
+      if ( !ins_1op_store ( ins, mem, &addr,
+                            INSTRUCTION_NAME_GET_SIBLING, err ) )
+        return false;
+      if ( !read_branch ( ins, mem, &addr, err ) ) return false;
+      break;
+    case 0x92: // get_child
+      if ( !ins_1op_store ( ins, mem, &addr,
+                            INSTRUCTION_NAME_GET_CHILD, err ) )
+        return false;
+      if ( !read_branch ( ins, mem, &addr, err ) ) return false;
+      break;
     case 0x93: // get_parent
       if ( !ins_1op_store ( ins, mem, &addr,
                             INSTRUCTION_NAME_GET_PARENT, err ) )
@@ -1219,7 +1251,10 @@ decode_next_inst (
             return false;
         }
       break;
-
+    case 0x99: // remove_obj
+      if ( !ins_1op ( ins, mem, &addr, INSTRUCTION_NAME_REMOVE_OBJ, err ) )
+        return false;
+      break;
     case 0x9a: // print_obj
       if ( !ins_1op ( ins, mem, &addr, INSTRUCTION_NAME_PRINT_OBJ, err ) )
         return false;
@@ -1256,7 +1291,18 @@ decode_next_inst (
       if ( !ins_1op_branch ( ins, mem, &addr, INSTRUCTION_NAME_JZ, err ) )
         return false;
       break;
-
+    case 0xa1: // get_sibling
+      if ( !ins_1op_store ( ins, mem, &addr,
+                            INSTRUCTION_NAME_GET_SIBLING, err ) )
+        return false;
+      if ( !read_branch ( ins, mem, &addr, err ) ) return false;
+      break;
+    case 0xa2: // get_child
+      if ( !ins_1op_store ( ins, mem, &addr,
+                            INSTRUCTION_NAME_GET_CHILD, err ) )
+        return false;
+      if ( !read_branch ( ins, mem, &addr, err ) ) return false;
+      break;
     case 0xa3: // get_parent
       if ( !ins_1op_store ( ins, mem, &addr,
                             INSTRUCTION_NAME_GET_PARENT, err ) )
@@ -1288,7 +1334,10 @@ decode_next_inst (
             return false;
         }
       break;
-
+    case 0xa9: // remove_obj
+      if ( !ins_1op ( ins, mem, &addr, INSTRUCTION_NAME_REMOVE_OBJ, err ) )
+        return false;
+      break;
     case 0xaa: // print_obj
       if ( !ins_1op ( ins, mem, &addr, INSTRUCTION_NAME_PRINT_OBJ, err ) )
         return false;
@@ -1397,7 +1446,7 @@ decode_next_inst (
       if ( !read_var_ops ( ins, mem, &addr, false, err ) ) return false;
       if ( !ins_var_2ops ( ins, INSTRUCTION_NAME_STORE, err ) ) return false;
       break;
-
+      
     case 0xcf: // loadw
       if ( !read_var_ops_store ( ins, mem, &addr, false, err ) ) return false;
       if ( !ins_var_2ops ( ins, INSTRUCTION_NAME_LOADW, err ) ) return false;
@@ -1508,7 +1557,14 @@ decode_next_inst (
           ins->name= INSTRUCTION_NAME_SET_WINDOW;
         }
       break;
-
+    case 0xec: // call_vs2
+      if ( mem->sf_mem[0] >= 4 )
+        {
+          if ( !read_var_ops_store ( ins, mem, &addr, true, err ) )
+            return false;
+          if ( !ins_call ( ins, mem, err ) ) return false;
+        }
+      break;
     case 0xed: // erase_window
       if ( mem->sf_mem[0] >= 4 )
         {

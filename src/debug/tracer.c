@@ -81,12 +81,15 @@ get_inst_name (
     case INSTRUCTION_NAME_DEC_CHK         : return "dec_chk         ";
     case INSTRUCTION_NAME_DIV             : return "div             ";
     case INSTRUCTION_NAME_ERASE_WINDOW    : return "erase_window    ";
+    case INSTRUCTION_NAME_GET_CHILD       : return "get_child       ";
     case INSTRUCTION_NAME_GET_PARENT      : return "get_parent      ";
     case INSTRUCTION_NAME_GET_PROP        : return "get_prop        ";
     case INSTRUCTION_NAME_GET_PROP_ADDR   : return "get_prop_addr   ";
     case INSTRUCTION_NAME_GET_PROP_LEN    : return "get_prop_len    ";
+    case INSTRUCTION_NAME_GET_SIBLING     : return "get_sibling     ";
     case INSTRUCTION_NAME_INC             : return "inc             ";
     case INSTRUCTION_NAME_INC_CHK         : return "inc_chk         ";
+    case INSTRUCTION_NAME_INSERT_OBJ      : return "insert_obj      ";
     case INSTRUCTION_NAME_JE              : return "je              ";
     case INSTRUCTION_NAME_JG              : return "jg              ";
     case INSTRUCTION_NAME_JIN             : return "jin             ";
@@ -117,6 +120,7 @@ get_inst_name (
     case INSTRUCTION_NAME_QUIT            : return "quit            ";
     case INSTRUCTION_NAME_READ            : return "read            ";
     case INSTRUCTION_NAME_READ_CHAR       : return "read_char       ";
+    case INSTRUCTION_NAME_REMOVE_OBJ      : return "remove_obj      ";
     case INSTRUCTION_NAME_RESTORE_UNDO    : return "restore_undo    ";
     case INSTRUCTION_NAME_RET             : return "ret             ";
     case INSTRUCTION_NAME_RET_POPPED      : return "ret_popped      ";

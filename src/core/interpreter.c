@@ -964,6 +964,7 @@ get_object_offset (
 } // end get_object_offset
 
 
+// addr==0 indica que no s'ha trobat.
 static bool
 get_prop_addr_len (
                    Interpreter     *intp,
@@ -1061,6 +1062,37 @@ get_prop_addr (
 
 
 static bool
+get_prop_default (
+                  Interpreter     *intp,
+                  const uint16_t   property,
+                  uint16_t        *data,
+                  char           **err
+                  )
+{
+
+  uint32_t offset;
+  
+
+  // Comprovacions i obté property pointer
+  if ( (intp->version <= 3 && (property < 1 || property > 31)) ||
+       (intp->version > 3 && (property < 1 || property > 63)) )
+    {
+      msgerror ( err, "Failed to get property value: invalid"
+                 " property index %u", property );
+      return false;
+    }
+
+  // Llig valor
+  offset= intp->object_table_offset + (property-1)*2;
+  if ( !memory_map_READW ( intp->mem, offset, data, false, err ) )
+    return false;
+  
+  return true;
+  
+} // end get_prop_default
+
+
+static bool
 get_prop (
           Interpreter     *intp,
           const uint16_t   object,
@@ -1077,9 +1109,14 @@ get_prop (
   // Obté adreça i longitut
   if ( !get_prop_addr_len ( intp, object, property, &addr, &len, err ) )
     return false;
-
+  
   // Obté contingut
-  if ( len == 1 )
+  if ( addr == 0 ) // Torna valor de la taula per defecte
+    {
+      if ( !get_prop_default ( intp, property, data, err ) )
+        return false;
+    }
+  else if ( len == 1 )
     {
       if ( !memory_map_READB ( intp->mem, (uint32_t) addr, &tmp, false, err ) )
         return false;
@@ -1146,6 +1183,47 @@ get_prop_len (
 
 
 static bool
+get_child (
+           Interpreter     *intp,
+           const uint16_t   object,
+           uint16_t        *res,
+           bool            *cond,
+           char           **err
+           )
+{
+
+  uint32_t object_offset,offset;
+  uint8_t tmp8;
+  
+  
+  // Obté object offset
+  if ( !get_object_offset ( intp, object, &object_offset, err ) )
+    return false;
+  
+  // Offset fill.
+  if ( intp->version <= 3 )
+    {
+      offset= object_offset + 4 + 2;
+      if ( !memory_map_READB ( intp->mem, offset, &tmp8, false, err ) )
+        return false;
+      *res= (uint16_t) tmp8;
+    }
+  else
+    {
+      offset= object_offset + 6 + 4;
+      if ( !memory_map_READW ( intp->mem, offset, res, false, err ) )
+        return false;
+    }
+  
+  // Condició
+  *cond= (*res!=0);
+  
+  return true;
+  
+} // end get_child
+
+
+static bool
 get_parent (
             Interpreter     *intp,
             const uint16_t   object,
@@ -1180,6 +1258,47 @@ get_parent (
   return true;
   
 } // end get_parent
+
+
+static bool
+get_sibling (
+             Interpreter     *intp,
+             const uint16_t   object,
+             uint16_t        *res,
+             bool            *cond,
+             char           **err
+             )
+{
+
+  uint32_t object_offset,offset;
+  uint8_t tmp8;
+  
+  
+  // Obté object offset
+  if ( !get_object_offset ( intp, object, &object_offset, err ) )
+    return false;
+  
+  // Offset 'next'.
+  if ( intp->version <= 3 )
+    {
+      offset= object_offset + 4 + 1;
+      if ( !memory_map_READB ( intp->mem, offset, &tmp8, false, err ) )
+        return false;
+      *res= (uint16_t) tmp8;
+    }
+  else
+    {
+      offset= object_offset + 6 + 2;
+      if ( !memory_map_READW ( intp->mem, offset, res, false, err ) )
+        return false;
+    }
+  
+  // Condició
+  *cond= (*res!=0);
+  
+  return true;
+  
+} // end get_sibling
 
 
 static bool
@@ -1383,6 +1502,206 @@ jin (
   return true;
   
 } // end jin
+
+
+static bool
+remove_obj (
+            Interpreter     *intp,
+            const uint16_t   object,
+            char           **err
+            )
+{
+
+  uint32_t object_offset,offset;
+  uint8_t tmp8;
+  uint16_t parent,next,p,p_next;
+  bool stop;
+  
+  
+  // Obté object offset
+  if ( !get_object_offset ( intp, object, &object_offset, err ) )
+    return false;
+  
+  // Obté pare, sibling i fica a null pare
+  if ( intp->version <= 3 )
+    {
+      offset= object_offset + 4;
+      if ( !memory_map_READB ( intp->mem, offset, &tmp8, false, err ) )
+        return false;
+      parent= (uint16_t) tmp8;
+      // Si no té pare no fa res.
+      if ( parent == 0 ) return true;
+      if ( !memory_map_READB ( intp->mem, offset+1, &tmp8, false, err ) )
+        return false;
+      next= (uint16_t) tmp8;
+      if ( !memory_map_WRITEB ( intp->mem, offset, 0, false, err ) )
+        return false;
+      if ( !memory_map_WRITEB ( intp->mem, offset+1, 0, false, err ) )
+        return false;
+    }
+  else
+    {
+      offset= object_offset + 6;
+      if ( !memory_map_READW ( intp->mem, offset, &parent, false, err ) )
+        return false;
+      // Si no té pare no fa res.
+      if ( parent == 0 ) return true;
+      if ( !memory_map_READW ( intp->mem, offset+2, &next, false, err ) )
+        return false;
+      if ( !memory_map_WRITEW ( intp->mem, offset, 0, false, err ) )
+        return false;
+      if ( !memory_map_WRITEW ( intp->mem, offset+2, 0, false, err ) )
+        return false;
+    }
+
+  
+  // Elimina node de la llista de fills del pare
+  if ( !get_object_offset ( intp, parent, &object_offset, err ) )
+    return false;
+  if ( intp->version <= 3 )
+    {
+
+      // Primer fill.
+      offset= object_offset + 4 + 2;
+      if ( !memory_map_READB ( intp->mem, offset, &tmp8, false, err ) )
+        return false;
+      p= (uint16_t) tmp8;
+      if ( p == object )
+        {
+          if ( !memory_map_WRITEB ( intp->mem, offset,
+                                    (uint8_t) next, false, err ) )
+            return false;
+          stop= true;
+        }
+      else stop= false;
+
+      // Cerca i fica a 0
+      while ( !stop && p != 0 )
+        {
+          if ( !get_object_offset ( intp, parent, &object_offset, err ) )
+            return false;
+          offset= object_offset + 4 + 1;
+          if ( !memory_map_READB ( intp->mem, offset, &tmp8, false, err ) )
+            return false;
+          p_next= (uint16_t) tmp8;
+          if ( p_next == object )
+            {
+              if ( !memory_map_WRITEB ( intp->mem, offset,
+                                        (uint8_t) next, false, err ) )
+                return false;
+              stop= true;
+            }
+          else p= p_next;
+        }
+      
+    }
+  else
+    {
+
+      // Primer fill.
+      offset= object_offset + 6 + 4;
+      if ( !memory_map_READW ( intp->mem, offset, &p, false, err ) )
+        return false;
+      if ( p == object )
+        {
+          if ( !memory_map_WRITEW ( intp->mem, offset, next, false, err ) )
+            return false;
+          stop= true;
+        }
+      else stop= false;
+      
+      // Cerca i fica a 0
+      while ( !stop && p != 0 )
+        {
+          if ( !get_object_offset ( intp, parent, &object_offset, err ) )
+            return false;
+          offset= object_offset + 6 + 2;
+          if ( !memory_map_READW ( intp->mem, offset, &p_next, false, err ) )
+            return false;
+          if ( p_next == object )
+            {
+              if ( !memory_map_WRITEW ( intp->mem, offset, next, false, err ) )
+                return false;
+              stop= true;
+            }
+          else p= p_next;
+        }
+      
+    }
+  
+  return true;
+  
+} // end remove_obj
+
+
+static bool
+insert_obj (
+            Interpreter     *intp,
+            const uint16_t   object,
+            const uint16_t   destination,
+            char           **err
+            )
+{
+
+  uint32_t object_offset,offset;
+  uint8_t tmp8;
+  uint16_t next;
+  
+
+  // Comença llevant-lo del pare.
+  if ( !remove_obj ( intp, object, err ) ) return false;
+
+  // Modifica destination i obté next
+  if ( !get_object_offset ( intp, destination, &object_offset, err ) )
+    return false;
+  if ( intp->version <= 3 )
+    {
+      offset= object_offset + 4 + 2; // child
+      if ( !memory_map_READB ( intp->mem, offset, &tmp8, false, err ) )
+        return false;
+      next= (uint16_t) tmp8;
+      if ( !memory_map_WRITEB ( intp->mem, offset,
+                                (uint8_t) object, false, err ) )
+        return false;
+    }
+  else
+    {
+      offset= object_offset + 6 + 4; // child
+      if ( !memory_map_READW ( intp->mem, offset, &next, false, err ) )
+        return false;
+      if ( !memory_map_WRITEW ( intp->mem, offset, object, false, err ) )
+        return false;
+    }
+
+  // Modifica object
+  if ( !get_object_offset ( intp, object, &object_offset, err ) )
+    return false;
+  if ( intp->version <= 3 )
+    {
+      offset= object_offset + 4;
+      // Escriu pare
+      if ( !memory_map_WRITEB ( intp->mem, offset,
+                                (uint8_t) destination, false, err ) )
+        return false;
+      // Escriu sibling
+      if ( !memory_map_WRITEB ( intp->mem, offset+1,
+                                (uint8_t) next, false, err ) )
+        return false;
+    }
+  else
+    {
+      offset= object_offset + 6;
+      // Escriu pare
+      if ( !memory_map_WRITEW ( intp->mem, offset, destination, false, err ) )
+        return false;
+      // Escriu sibling
+      if ( !memory_map_WRITEW ( intp->mem, offset+2, next, false, err ) )
+        return false;
+    }
+  
+  return true;
+  
+} // end insert_obj
 
 
 static bool
@@ -2891,7 +3210,12 @@ exec_next_inst (
         { if ( !read_var ( intp, 0, &tmp16, err ) ) return RET_ERROR; }
       if ( !write_var ( intp, op1_u8, op2, err ) ) return RET_ERROR;
       break;
-      
+    case 0x0e: // insert_obj
+      if ( !read_small_small ( intp, &op1_u8, &op2_u8, err ) ) return RET_ERROR;
+      SET_U8TOU16(op1_u8,op1);
+      SET_U8TOU16(op2_u8,op2);
+      if ( !insert_obj ( intp, op1, op2, err ) ) return RET_ERROR;
+      break;
     case 0x0f: // loadw
       if ( !read_small_small_store ( intp, &op1_u8, &op2_u8, &result_var, err ))
         return RET_ERROR;
@@ -3065,7 +3389,11 @@ exec_next_inst (
         { if ( !read_var ( intp, 0, &tmp16, err ) ) return RET_ERROR; }
       if ( !write_var ( intp, op1_u8, op2, err ) ) return RET_ERROR;
       break;
-
+    case 0x2e: // insert_obj
+      if ( !read_small_var ( intp, &op1_u8, &op2, err ) ) return RET_ERROR;
+      SET_U8TOU16(op1_u8,op1);
+      if ( !insert_obj ( intp, op1, op2, err ) ) return RET_ERROR;
+      break;
     case 0x2f: // loadw
       if ( !read_small_var_store ( intp, &op1_u8, &op2, &result_var, err ) )
         return RET_ERROR;
@@ -3234,7 +3562,11 @@ exec_next_inst (
         { if ( !read_var ( intp, 0, &tmp16, err ) ) return RET_ERROR; }
       if ( !write_var ( intp, ref, op2, err ) ) return RET_ERROR;
       break;
-
+    case 0x4e: // insert_obj
+      if ( !read_var_small ( intp, &op1, &op2_u8, err ) ) return RET_ERROR;
+      SET_U8TOU16(op2_u8,op2);
+      if ( !insert_obj ( intp, op1, op2, err ) ) return RET_ERROR;
+      break;
     case 0x4f: // loadw
       if ( !read_var_small_store ( intp, &op1, &op2_u8, &result_var, err ) )
         return RET_ERROR;
@@ -3384,7 +3716,10 @@ exec_next_inst (
         { if ( !read_var ( intp, 0, &tmp16, err ) ) return RET_ERROR; }
       if ( !write_var ( intp, ref, op2, err ) ) return RET_ERROR;
       break;
-
+    case 0x6e: // insert_obj
+      if ( !read_var_var ( intp, &op1, &op2, err ) ) return RET_ERROR;
+      if ( !insert_obj ( intp, op1, op2, err ) ) return RET_ERROR;
+      break;
     case 0x6f: // loadw
       if ( !read_var_var_store ( intp, &op1, &op2, &result_var, err ) )
         return RET_ERROR;
@@ -3467,7 +3802,20 @@ exec_next_inst (
       state->PC+= 2;
       if ( !branch ( intp, op1 == 0, err ) ) return RET_ERROR;
       break;
-
+    case 0x81: // get_sibling
+      if ( !read_op1_large_store ( intp, &op1, &result_var, err ) )
+        return RET_ERROR;
+      if ( !get_sibling ( intp, op1, &res, &cond, err ) ) return RET_ERROR;
+      if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
+      if ( !branch ( intp, cond, err ) ) return RET_ERROR;
+      break;
+    case 0x82: // get_child
+      if ( !read_op1_large_store ( intp, &op1, &result_var, err ) )
+        return RET_ERROR;
+      if ( !get_child ( intp, op1, &res, &cond, err ) ) return RET_ERROR;
+      if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
+      if ( !branch ( intp, cond, err ) ) return RET_ERROR;
+      break;
     case 0x83: // get_parent
       if ( !read_op1_large_store ( intp, &op1, &result_var, err ) )
         return RET_ERROR;
@@ -3505,7 +3853,12 @@ exec_next_inst (
       if ( !call_routine ( intp, ops, 1, result_var, false, err ) )
         return RET_ERROR;
       break;
-
+    case 0x89: // remove_obj
+      if ( !memory_map_READW ( intp->mem, state->PC, &op1, true, err ) )
+        return RET_ERROR;
+      state->PC+= 2;
+      if ( !remove_obj ( intp, op1, err ) ) return RET_ERROR;
+      break;
     case 0x8a: // print_obj
       if ( !memory_map_READW ( intp->mem, state->PC, &op1, true, err ) )
         return RET_ERROR;
@@ -3556,7 +3909,22 @@ exec_next_inst (
         return RET_ERROR;
       if ( !branch ( intp, op1_u8 == 0, err ) ) return RET_ERROR;
       break;
-
+    case 0x91: // get_sibling
+      if ( !read_op1_small_store ( intp, &op1_u8, &result_var, err ) )
+        return RET_ERROR;
+      SET_U8TOU16(op1_u8,op1);
+      if ( !get_sibling ( intp, op1, &res, &cond, err ) ) return RET_ERROR;
+      if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
+      if ( !branch ( intp, cond, err ) ) return RET_ERROR;
+      break;
+    case 0x92: // get_child
+      if ( !read_op1_small_store ( intp, &op1_u8, &result_var, err ) )
+        return RET_ERROR;
+      SET_U8TOU16(op1_u8,op1);
+      if ( !get_child ( intp, op1, &res, &cond, err ) ) return RET_ERROR;
+      if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
+      if ( !branch ( intp, cond, err ) ) return RET_ERROR;
+      break;
     case 0x93: // get_parent
       if ( !read_op1_small_store ( intp, &op1_u8, &result_var, err ) )
         return RET_ERROR;
@@ -3600,7 +3968,12 @@ exec_next_inst (
       if ( !call_routine ( intp, ops, 1, result_var, false, err ) )
         return RET_ERROR;
       break;
-
+    case 0x99: // remove_obj
+      if ( !memory_map_READB ( intp->mem, state->PC++, &op1_u8, true, err ) )
+        return RET_ERROR;
+      SET_U8TOU16(op1_u8,op1);
+      if ( !remove_obj ( intp, op1, err ) ) return RET_ERROR;
+      break;
     case 0x9a: // print_obj
       if ( !memory_map_READB ( intp->mem, state->PC++, &op1_u8, true, err ) )
         return RET_ERROR;
@@ -3652,7 +4025,20 @@ exec_next_inst (
       if ( !read_op1_var ( intp, &op1, err ) ) return RET_ERROR;
       if ( !branch ( intp, op1 == 0, err ) ) return RET_ERROR;
       break;
-
+    case 0xa1: // get_sibling
+      if ( !read_op1_var_store ( intp, &op1, &result_var, err ) )
+        return RET_ERROR;
+      if ( !get_sibling ( intp, op1, &res, &cond, err ) ) return RET_ERROR;
+      if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
+      if ( !branch ( intp, cond, err ) ) return RET_ERROR;
+      break;
+    case 0xa2: // get_child
+      if ( !read_op1_var_store ( intp, &op1, &result_var, err ) )
+        return RET_ERROR;
+      if ( !get_child ( intp, op1, &res, &cond, err ) ) return RET_ERROR;
+      if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
+      if ( !branch ( intp, cond, err ) ) return RET_ERROR;
+      break;
     case 0xa3: // get_parent
       if ( !read_op1_var_store ( intp, &op1, &result_var, err ) )
         return RET_ERROR;
@@ -3694,7 +4080,10 @@ exec_next_inst (
       if ( !call_routine ( intp, ops, 1, result_var, false, err ) )
         return RET_ERROR;
       break;
-
+    case 0xa9: // remove_obj
+      if ( !read_op1_var ( intp, &op1, err ) ) return RET_ERROR;
+      if ( !remove_obj ( intp, op1, err ) ) return RET_ERROR;
+      break;
     case 0xaa: // print_obj
       if ( !read_op1_var ( intp, &op1, err ) ) return RET_ERROR;
       if ( !print_obj ( intp, op1, err ) ) return RET_ERROR;
@@ -4053,7 +4442,14 @@ exec_next_inst (
       if ( !screen_set_window ( intp->screen, (int16_t) op1, err ) )
         return RET_ERROR;
       break;
-
+    case 0xec: // call_vs2
+      if ( intp->version < 4 ) goto wrong_version;
+      if ( !read_var_ops_store ( intp, ops, &nops, -1, true,
+                                 &result_var, err ) )
+        return RET_ERROR;
+      if ( !call_routine ( intp, ops, nops, result_var, true, err ) )
+        return RET_ERROR;
+      break;
     case 0xed: // erase_window
       if ( intp->version < 4 ) goto wrong_version;
       if ( !read_var_ops ( intp, ops, &nops, 1, false, err ) ) return RET_ERROR;
