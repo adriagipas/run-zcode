@@ -117,6 +117,7 @@ get_inst_name (
     case INSTRUCTION_NAME_PULL            : return "pull            ";
     case INSTRUCTION_NAME_PUSH            : return "push            ";
     case INSTRUCTION_NAME_PUT_PROP        : return "put_prop        ";
+    case INSTRUCTION_NAME_RANDOM          : return "random          ";
     case INSTRUCTION_NAME_QUIT            : return "quit            ";
     case INSTRUCTION_NAME_READ            : return "read            ";
     case INSTRUCTION_NAME_READ_CHAR       : return "read_char       ";
@@ -141,6 +142,7 @@ get_inst_name (
     case INSTRUCTION_NAME_SUB             : return "sub             ";
     case INSTRUCTION_NAME_TEST_ATTR       : return "test_attr       ";
     case INSTRUCTION_NAME_THROW           : return "throw           ";
+    case INSTRUCTION_NAME_TOKENISE        : return "tokenise        ";
     case INSTRUCTION_NAME_UNK             :
     default                               : return "unknown         ";
     }

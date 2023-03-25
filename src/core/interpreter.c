@@ -210,6 +210,79 @@ static const uint16_t ZSCII_TO_UNICODE[97]=
 /* FUNCIONS PRIVADES */
 /*********************/
 
+static void
+random_reset (
+              Interpreter *intp
+              )
+{
+
+  intp->random.seed= 0;
+  intp->random.current= 0;
+  intp->random.mode= RAND_MODE_RANDOM;
+  
+} // end random_reset
+
+
+static void
+random_set_seed (
+                 Interpreter    *intp,
+                 const uint16_t  seed
+                 )
+{
+
+  intp->random.seed= seed;
+  if ( seed == 0 )
+    intp->random.mode= RAND_MODE_RANDOM;
+  else if ( seed >= 1000 )
+    {
+      srand ( (unsigned int) seed );
+      intp->random.mode= RAND_MODE_PREDICTABLE2;
+    }
+  else
+    {
+      intp->random.current= 1;
+      intp->random.mode= RAND_MODE_PREDICTABLE1;
+    }
+  
+} // end random_set_seed
+
+
+static uint16_t
+random_next (
+             Interpreter *intp
+             )
+{
+
+  uint16_t ret;
+  gint64 time;
+  
+  
+  switch ( intp->random.mode )
+    {
+    case RAND_MODE_RANDOM:
+      time= g_get_monotonic_time () / 1000;
+      ret= (time%32767)+1;
+      break;
+    case RAND_MODE_PREDICTABLE1:
+      ret= intp->random.current;
+      if ( intp->random.current == intp->random.seed )
+        intp->random.current= 1;
+      else
+        ++(intp->random.current);
+      break;
+    case RAND_MODE_PREDICTABLE2:
+      ret= (uint16_t) ((rand ()%32767) + 1);
+      break;
+    default:
+      ee ( "random_next - WTF!!!!" );
+      ret= 0;
+    }
+  
+  return ret;
+  
+} // end random_next
+
+
 static uint32_t
 unpack_addr (
              const Interpreter *intp,
@@ -2974,6 +3047,50 @@ copy_table (
 } // end copy_table
 
 
+static bool
+tokenise (
+          Interpreter      *intp,
+          const operand_t  *ops,
+          const int         nops,
+          char            **err
+          )
+{
+
+  uint16_t text,parse,dictionary,flag;
+  bool use_dictionary;
+
+  
+  // Obté paràmetres
+  flag= 0;
+  use_dictionary= false;
+  if ( nops < 2 || nops > 4 )
+    {
+      msgerror ( err, "Failed to execute tokenise: wrong number of arguments" );
+      return false;
+    }
+  if ( !op_to_u16 ( intp, &(ops[0]), &text, err ) ) return false;
+  if ( !op_to_u16 ( intp, &(ops[1]), &parse, err ) ) return false;
+  if ( nops >= 3 )
+    {
+      use_dictionary= true;
+      if ( !op_to_u16 ( intp, &(ops[2]), &dictionary, err ) ) return false;
+      if ( nops == 4 )
+        {
+          if ( !op_to_u16 ( intp, &(ops[3]), &flag, err ) ) return false;
+        }
+    }
+  if ( use_dictionary ) ee ( "tokenise - CAL_IMPLEMENTAR DICTIONARY" );
+  if ( flag!=0 ) ee ( "tokenise - CAL_IMPLEMENTAR FLAG" );
+
+  // Parseja
+  if ( !dictionary_parse ( intp->std_dict, text, parse, err ) )
+    return false;
+
+  return true;
+  
+} // end tokenise
+
+
 // Si el color no és suportat torna un no suportat
 static uint16_t
 color2true_color (
@@ -3296,6 +3413,16 @@ exec_next_inst (
       res= (uint16_t) (((int16_t) op1) % ((int16_t) op2));
       if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
       break;
+    case 0x19: // call_2s
+      if ( intp->version < 4 ) goto wrong_version;
+      ops[0].type= OP_SMALL;
+      ops[1].type= OP_SMALL;
+      if ( !read_small_small_store ( intp, &(ops[0].u8.val),
+                                     &(ops[1].u8.val), &result_var, err ))
+        return RET_ERROR;
+      if ( !call_routine ( intp, ops, 2, result_var, false, err ) )
+        return RET_ERROR;
+      break;
 
     case 0x1b: // set_colour
       if ( intp->version < 5 ) goto wrong_version;
@@ -3464,6 +3591,16 @@ exec_next_inst (
       if ( op2 == 0 ) goto division0;
       res= (uint16_t) (((int16_t) op1) % ((int16_t) op2));
       if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
+      break;
+    case 0x39: // call_2s
+      if ( intp->version < 4 ) goto wrong_version;
+      ops[0].type= OP_SMALL;
+      ops[1].type= OP_VARIABLE;
+      if ( !read_small_small_store ( intp, &(ops[0].u8.val),
+                                     &(ops[1].u8.val), &result_var, err ))
+        return RET_ERROR;
+      if ( !call_routine ( intp, ops, 2, result_var, false, err ) )
+        return RET_ERROR;
       break;
       
     case 0x3b: // set_colour
@@ -3638,7 +3775,17 @@ exec_next_inst (
       res= (uint16_t) (((int16_t) op1) % ((int16_t) op2));
       if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
       break;
-
+    case 0x59: // call_2s
+      if ( intp->version < 4 ) goto wrong_version;
+      ops[0].type= OP_VARIABLE;
+      ops[1].type= OP_SMALL;
+      if ( !read_small_small_store ( intp, &(ops[0].u8.val),
+                                     &(ops[1].u8.val), &result_var, err ))
+        return RET_ERROR;
+      if ( !call_routine ( intp, ops, 2, result_var, false, err ) )
+        return RET_ERROR;
+      break;
+      
     case 0x5b: // set_colour
       if ( intp->version < 5 ) goto wrong_version;
       if ( !read_var_small ( intp, &op1, &op2_u8, err ) ) return RET_ERROR;
@@ -3781,6 +3928,16 @@ exec_next_inst (
       if ( op2 == 0 ) goto division0;
       res= (uint16_t) (((int16_t) op1) % ((int16_t) op2));
       if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
+      break;
+    case 0x79: // call_2s
+      if ( intp->version < 4 ) goto wrong_version;
+      ops[0].type= OP_VARIABLE;
+      ops[1].type= OP_VARIABLE;
+      if ( !read_small_small_store ( intp, &(ops[0].u8.val),
+                                     &(ops[1].u8.val), &result_var, err ))
+        return RET_ERROR;
+      if ( !call_routine ( intp, ops, 2, result_var, false, err ) )
+        return RET_ERROR;
       break;
 
     case 0x7b: // set_colour
@@ -4401,7 +4558,20 @@ exec_next_inst (
       if ( !op_to_u16 ( intp, &(ops[0]), &op1, err ) ) return RET_ERROR;
       if ( !print_num ( intp, op1, err ) ) return RET_ERROR;
       break;
-
+    case 0xe7: // random
+      if ( !read_var_ops_store ( intp, ops, &nops, 1,
+                                 false, &result_var, err ) )
+        return RET_ERROR;
+      if ( !op_to_u16 ( intp, &(ops[0]), &op1, err ) ) return RET_ERROR;
+      if ( ((int16_t) op1) > 0  )
+        res= ((random_next ( intp ) - 1)%op1) + 1;
+      else // seed
+        {
+          res= 0;
+          random_set_seed ( intp, -((int16_t) op1) );
+        }
+      if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
+      break;
     case 0xe8: // push
       if ( !read_var_ops ( intp, ops, &nops, 1, false, err ) ) return RET_ERROR;
       if ( !op_to_u16 ( intp, &(ops[0]), &op1, err ) ) return RET_ERROR;
@@ -4535,6 +4705,12 @@ exec_next_inst (
         return RET_ERROR;
       if ( !call_routine ( intp, ops, nops, 0x00, true, err ) )
         return RET_ERROR;
+      break;
+    case 0xfb: // tokenise
+      if ( intp->version < 5 ) goto wrong_version;
+      if ( !read_var_ops ( intp, ops, &nops, -1, false, err ) )
+        return RET_ERROR;
+      if ( !tokenise ( intp, ops, nops, err ) ) return RET_ERROR;
       break;
 
     case 0xfd: // copy_table
@@ -4761,6 +4937,7 @@ interpreter_new_from_file_name (
   if ( ret->mem == NULL ) goto error;
 
   // Altres
+  random_reset ( ret );
   ret->version= ret->mem->sf_mem[0];
   if ( ret->version >= 6 && ret->version <= 7 )
     {

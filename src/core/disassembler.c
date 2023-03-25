@@ -772,7 +772,14 @@ decode_next_inst (
       if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_MOD, err ) )
         return false;
       break;
-
+    case 0x19: // call_2s
+      if ( mem->sf_mem[0] >= 4 )
+        {
+          if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_CALL, err ) )
+            return false;
+        }
+      break;
+      
     case 0x1b: // set_colour
       if ( mem->sf_mem[0] >= 5 )
         {
@@ -882,6 +889,13 @@ decode_next_inst (
     case 0x38: // mod
       if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_MOD, err ) )
         return false;
+      break;
+    case 0x39: // call_2s
+      if ( mem->sf_mem[0] >= 4 )
+        {
+          if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_CALL, err ) )
+            return false;
+        }
       break;
 
     case 0x3b: // set_colour
@@ -994,6 +1008,13 @@ decode_next_inst (
       if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_MOD, err ) )
         return false;
       break;
+    case 0x59: // call_2s
+      if ( mem->sf_mem[0] >= 4 )
+        {
+          if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_CALL, err ) )
+            return false;
+        }
+      break;
 
     case 0x5b: // set_colour
       if ( mem->sf_mem[0] >= 5 )
@@ -1104,6 +1125,13 @@ decode_next_inst (
     case 0x78: // mod
       if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_MOD, err ) )
         return false;
+      break;
+    case 0x79: // call_2s
+      if ( mem->sf_mem[0] >= 4 )
+        {
+          if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_CALL, err ) )
+            return false;
+        }
       break;
 
     case 0x7b: // set_colour
@@ -1527,7 +1555,11 @@ decode_next_inst (
       if ( !read_var_ops ( ins, mem, &addr, false, err ) ) return false;
       ins->name= INSTRUCTION_NAME_PRINT_NUM;
       break;
-
+    case 0xe7: // random
+      if ( !read_var_ops_store ( ins, mem, &addr, false, err ) )
+        return false;
+      ins->name= INSTRUCTION_NAME_RANDOM;
+      break;
     case 0xe8: // push
       if ( !read_var_ops ( ins, mem, &addr, false, err ) ) return false;
       ins->name= INSTRUCTION_NAME_PUSH;
@@ -1638,6 +1670,13 @@ decode_next_inst (
         {
           if ( !read_var_ops ( ins, mem, &addr, true, err ) ) return false;
           if ( !ins_call ( ins, mem, err ) ) return false;
+        }
+      break;
+    case 0xfb: // tokenise
+      if ( mem->sf_mem[0] >= 5 )
+        {
+          if ( !read_var_ops ( ins, mem, &addr, false, err ) ) return false;
+          ins->name= INSTRUCTION_NAME_TOKENISE;
         }
       break;
 

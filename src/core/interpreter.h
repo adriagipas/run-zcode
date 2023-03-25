@@ -108,6 +108,18 @@ typedef struct
     bool    enabled;
     uint8_t v[3][26];
   } alph_table;
+
+  // Random generator
+  struct
+  {
+    enum {
+      RAND_MODE_RANDOM,
+      RAND_MODE_PREDICTABLE1,
+      RAND_MODE_PREDICTABLE2
+    }        mode;
+    uint16_t seed;
+    uint16_t current;
+  } random;
   
 } Interpreter;
 
