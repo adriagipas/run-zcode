@@ -130,7 +130,7 @@ scroll_low (
 
   uint32_t *fb;
   uint32_t color;
-  size_t i,j,line_size,nvals;
+  size_t i,j,line_size,end;
 
   
   fb= s->_fb;
@@ -139,17 +139,15 @@ scroll_low (
   
   // Cópia amunt
   line_size= ((size_t) s->_line_height)*((size_t) s->_width);
-  nvals= ((size_t) ((s->_lines-s->_upwin_lines)-1)) * line_size;
+  end= ((size_t) ((s->_lines-1))) * line_size;
   for ( i= line_size*((size_t) s->_upwin_lines), j= i+line_size;
-        i < nvals;
+        i < end;
         ++i, ++j )
     fb[i]= fb[j];
 
   // Última línia
   color= true_color_to_u32 ( s, s->_cursors[W_LOW].set_bg_color );
-  for ( i= line_size*((size_t) (s->_lines-1)), j= 0;
-        j < line_size;
-        ++i, ++j )
+  for ( i= end, j= 0; j < line_size; ++i, ++j )
     fb[i]= color;
   
 } // end scroll_low

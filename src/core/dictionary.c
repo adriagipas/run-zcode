@@ -451,7 +451,7 @@ dictionary_load (
       d->_size= d->_N;
       d->_entries= g_renew ( DictionaryEntry, d->_entries, d->_size );
     }
-
+  
   // Entries
   for ( n= 0; n < (int) (d->_N); ++n )
     {
