@@ -993,13 +993,16 @@ screen_set_colour (
                    const uint16_t  bg
                    )
 {
+
+  int i;
+
   
-  set_colour ( screen, fg,
-               &screen->_cursors[screen->_current_win].set_fg_color,
-               C_BLACK );
-  set_colour ( screen, bg,
-               &screen->_cursors[screen->_current_win].set_bg_color,
-               C_WHITE );
+  // NOTA!! Tot pareix apuntar a que afecta a les dos finestres.
+  for ( i= 0; i < 2; ++i )
+    {
+      set_colour ( screen, fg, &screen->_cursors[i].set_fg_color, C_BLACK );
+      set_colour ( screen, bg, &screen->_cursors[i].set_bg_color, C_WHITE );
+    }
   
 } // end screen_set_colour
 
