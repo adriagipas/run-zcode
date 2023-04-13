@@ -32,6 +32,7 @@
 #include <SDL.h>
 
 #include "conf.h"
+#include "extra_chars.h"
 #include "fonts.h"
 #include "window.h"
 
@@ -79,10 +80,11 @@ typedef struct
 {
 
   // CAMPS PRIVATS.
-  Conf   *_conf;
-  Window *_win;
-  Fonts  *_fonts;
-  int     _version;
+  Conf       *_conf;
+  Window     *_win;
+  Fonts      *_fonts;
+  ExtraChars *_extra_chars;
+  int         _version;
   
   // Dimensions.
   int _lines;
@@ -225,6 +227,9 @@ screen_set_cursor (
                    char      **err
                    );
 
+
+#define screen_ADD_EXTRA_CHAR(SCREEN,UNICODE,ZCODE,ERR)                 \
+  (extra_chars_add ( (SCREEN)->_extra_chars, (UNICODE), (ZCODE), (ERR) ))
 #define screen_GET_LINES(SCREEN) ((SCREEN)->_lines)
 #define screen_GET_WIDTH_CHARS(SCREEN) ((SCREEN)->_width_chars)
 

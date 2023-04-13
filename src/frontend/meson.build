@@ -1,6 +1,8 @@
 FRONTEND= static_library('frontend',
                          'conf.h',
                          'conf.c',
+                         'extra_chars.h',
+                         'extra_chars.c',
                          'fonts.h',
                          'fonts.c',
                          'saves.h',

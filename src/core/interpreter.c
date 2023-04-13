@@ -129,6 +129,8 @@ static const char ZSCII_ENC_V1[3][26]=
      '!','?','_','#','\'','"','/','\\','<','-',':','(',')'}
   };
 
+static const int ZSCII_TO_UNICODE_SIZE= 69;
+
 // 155-251
 static const uint16_t ZSCII_TO_UNICODE[97]=
   {
@@ -200,7 +202,35 @@ static const uint16_t ZSCII_TO_UNICODE[97]=
     0x0153, // œ
     0x0152, // Œ
     0x00a1, // ¡
-    0x00bf  // ¿
+    0x00bf, // ¿
+    0xfffd, // Desconegut
+    0xfffd, // Desconegut
+    0xfffd, // Desconegut
+    0xfffd, // Desconegut
+    0xfffd, // Desconegut
+    0xfffd, // Desconegut
+    0xfffd, // Desconegut
+    0xfffd, // Desconegut
+    0xfffd, // Desconegut
+    0xfffd, // Desconegut
+    0xfffd, // Desconegut
+    0xfffd, // Desconegut
+    0xfffd, // Desconegut
+    0xfffd, // Desconegut
+    0xfffd, // Desconegut
+    0xfffd, // Desconegut
+    0xfffd, // Desconegut
+    0xfffd, // Desconegut
+    0xfffd, // Desconegut
+    0xfffd, // Desconegut
+    0xfffd, // Desconegut
+    0xfffd, // Desconegut
+    0xfffd, // Desconegut
+    0xfffd, // Desconegut
+    0xfffd, // Desconegut
+    0xfffd, // Desconegut
+    0xfffd, // Desconegut
+    0xfffd  // Desconegut
   };
 
 
@@ -2560,7 +2590,18 @@ print_input_text (
       else if ( zc >= 32 && zc <= 126 )
         { if ( !text_add ( intp, (char) zc, err ) ) return false; }
       else if ( zc >= 155 && zc <= 251 )
-        { ee ("print_input_text - CAL IMPLEMENTAR EXTRA CHARS"); }
+        {
+          if ( intp->echars.enabled )
+            {
+              if ( !text_add_unicode ( intp, intp->echars.v[zc-155], err ) )
+                return false;
+            }
+          else
+            {
+              if ( !text_add_unicode ( intp, ZSCII_TO_UNICODE[zc-155], err ) )
+                return false;
+            }
+        }
     }
   if ( !text_add ( intp, '\0', err ) ) return false;
   
@@ -4881,6 +4922,38 @@ load_alphabet_table (
 } // end load_alphabet_table
 
 
+static bool
+register_extra_chars (
+                      Interpreter  *intp,
+                      char        **err
+                      )
+{
+
+  int i;
+
+  
+  // Taula
+  if ( intp->echars.enabled )
+    {
+      for ( i= 0; i < intp->echars.N; ++i )
+        if ( !screen_ADD_EXTRA_CHAR ( intp->screen, intp->echars.v[i],
+                                      (uint8_t) (i+155), err  ) )
+          return false;
+    }
+  // Taula per defecte
+  else
+    {
+      for ( i= 0; i < ZSCII_TO_UNICODE_SIZE; ++i )
+        if ( !screen_ADD_EXTRA_CHAR ( intp->screen, ZSCII_TO_UNICODE[i],
+                                      (uint8_t) (i+155), err  ) )
+          return false;
+    }
+  
+  return true;
+  
+} // end register_extra_chars
+
+
 
 
 /**********************/
@@ -5030,6 +5103,9 @@ interpreter_new_from_file_name (
     {
       if ( !load_alphabet_table ( ret, alphabet_table_addr, err ) ) goto error;
     }
+
+  // Register extra chars in screen.
+  if ( !register_extra_chars ( ret, err ) ) goto error;
   
   return ret;
   

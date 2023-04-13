@@ -600,6 +600,7 @@ add_nontext_zscii (
 
 static void
 text_input2zscii (
+                  Screen     *screen,
                   const char *text,
                   uint8_t     buf[SCREEN_INPUT_TEXT_BUF],
                   int        *N
@@ -607,12 +608,25 @@ text_input2zscii (
 {
 
   const char *p;
-
-
-  for ( p= text; *p != '\0' && *N < SCREEN_INPUT_TEXT_BUF; ++p )
+  int end_pos;
+  uint8_t zc;
+  
+  
+  for ( p= text; *p != '\0' && *N < SCREEN_INPUT_TEXT_BUF; )
     {
       // Standard ascii
-      if ( *p >= 32 && *p <= 126 ) buf[(*N)++]= *p;
+      if ( *p >= 32 && *p <= 126 )
+        {
+          buf[(*N)++]= *p;
+          ++p;
+        }
+      else
+        {
+          zc= extra_chars_decode_next_char ( screen->_extra_chars,
+                                             p, &end_pos );
+          p+= end_pos;
+          if ( zc != 0 ) buf[(*N)++]= zc;
+        }
     }
   
 } // end text_input2zscii
@@ -747,6 +761,7 @@ screen_free (
         g_free ( s->_cursors[i].text_remain );
     }
   if ( s->_fb != NULL ) g_free ( s->_fb );
+  if ( s->_extra_chars != NULL ) extra_chars_free ( s->_extra_chars );
   if ( s->_fonts != NULL ) fonts_free ( s->_fonts );
   if ( s->_win != NULL ) window_free ( s->_win );
   g_free ( s );
@@ -776,6 +791,7 @@ screen_new (
   ret->_conf= conf;
   ret->_win= NULL;
   ret->_fonts= NULL;
+  ret->_extra_chars= NULL;
   ret->_version= version;
   ret->_fb= NULL;
   for ( n= 0; n < 2; ++n )
@@ -840,6 +856,7 @@ screen_new (
   ret->_current_style= F_ROMAN;
   ret->_current_style_val= 0x00;
   ret->_current_font_val= 1;
+  ret->_extra_chars= extra_chars_new ();
   
   // Inicialitza els cursors
   for ( n= 0; n < 2; ++n )
@@ -1035,7 +1052,7 @@ screen_read_char (
       case SDL_TEXTINPUT:
         if ( *e.text.text != '\0' )
           {
-            text_input2zscii ( e.text.text, buf, N );
+            text_input2zscii ( screen, e.text.text, buf, N );
             return true;
           }
         break;
