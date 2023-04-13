@@ -270,6 +270,7 @@ parse_token (
 
   uint16_t addr;
   uint32_t dst_addr;
+  int real_pos;
   
   
   if ( d->_token.N == 0 ) return true;
@@ -301,8 +302,9 @@ parse_token (
                             (uint8_t) (d->_token.N), true, err ) )
     return false;
   // --> Position
+  real_pos= pos + (d->_version>=5 ? 2 : 1);
   if ( !memory_map_WRITEB ( d->_mem, dst_addr+3,
-                            (uint8_t) (pos), true, err ) )
+                            (uint8_t) (real_pos), true, err ) )
     return false;
 
   // Incrementa nombre paraules
@@ -497,7 +499,7 @@ dictionary_parse (
   // Preparació.
   if ( d->_version <= 4 )
     {
-      nchars= 0;
+      nchars= -1;
       caddr= text_buf+1;
     }
   else
@@ -513,7 +515,7 @@ dictionary_parse (
   // Separa en paraules
   d->_token.N= 0;
   for ( i= 0, stop= false, p= caddr, wpos= 0, cwords= 0;
-        ((nchars != 0 && i < nchars) || (nchars == 0 && !stop))
+        ((nchars != -1 && i < nchars) || (nchars == -1 && !stop))
           && cwords < max_words;
         ++i, ++p )
     {
