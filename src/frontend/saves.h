@@ -39,6 +39,7 @@ typedef struct
   gboolean  _verbose;
   gchar    *_undo_fn[SAVES_MAX_UNDO];
   int       _N_undo;
+  int       _pos; // Principi de la llista
   
 } Saves;
 
@@ -52,7 +53,7 @@ saves_new (
            const gboolean verbose
            );
 
-// NULL en cas d'error. 
+// NULL en cas d'error. Si està ple esborra la més antiga.
 const gchar *
 saves_get_new_undo_file_name (
                               Saves  *s,

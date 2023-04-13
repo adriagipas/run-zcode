@@ -105,6 +105,7 @@ saves_new (
   ret= g_new ( Saves, 1 );
   ret->_verbose= verbose;
   ret->_N_undo= 0;
+  ret->_pos= 0;
   for ( n= 0; n < SAVES_MAX_UNDO; ++n )
     ret->_undo_fn[n]= NULL;
   
@@ -123,21 +124,22 @@ saves_get_new_undo_file_name (
   GString *buffer;
   GDateTime *dt;
   gchar *time_str;
+  int pos;
   
-
-  // Comprova queda espai.
+  
+  // Comprova queda espai, si no esborra
   if ( s->_N_undo == SAVES_MAX_UNDO )
     {
-      msgerror ( err,
-                 "max number of undo files reached" );
-      return NULL;
+      remove_undo_fn ( s, s->_pos );
+      --(s->_N_undo);
+      s->_pos= (s->_pos+1)%SAVES_MAX_UNDO;
     }
   
   // Prepara.
   buffer= NULL;
   dt= NULL;
   time_str= NULL;
-
+  
   // Crea el nom del fitxer.
   buffer= g_string_new ( NULL );
   dt= g_date_time_new_now_local ();
@@ -157,11 +159,13 @@ saves_get_new_undo_file_name (
                     s->_N_undo );
   g_free ( time_str ); time_str= NULL;
 
-  // Torna el nom del fitxer.
-  s->_undo_fn[s->_N_undo++]= buffer->str;
+  // Desa el nom del fitxer.
+  pos= (s->_pos + s->_N_undo)%SAVES_MAX_UNDO;
+  s->_undo_fn[pos]= buffer->str;
+  ++(s->_N_undo);
   g_string_free ( buffer, FALSE );
   
-  return s->_undo_fn[s->_N_undo-1];
+  return s->_undo_fn[pos];
   
  error:
   if ( buffer != NULL ) g_string_free ( buffer, TRUE );
@@ -178,10 +182,16 @@ saves_get_undo_file_name (
                           )
 {
 
+  int pos;
+
+  
   if ( s->_N_undo == 0 )
     return NULL;
   else
-    return s->_undo_fn[s->_N_undo-1];
+    {
+      pos= (s->_pos + s->_N_undo - 1)%SAVES_MAX_UNDO;
+      return s->_undo_fn[pos];
+    }
   
 } // end saves_get_undo_file_name
 
@@ -192,7 +202,14 @@ saves_remove_last_undo_file_name (
                                   )
 {
 
+  int pos;
+
+  
   if ( s->_N_undo > 0 )
-    remove_undo_fn ( s, --s->_N_undo );
+    {
+      --(s->_N_undo);
+      pos= (s->_pos + s->_N_undo)%SAVES_MAX_UNDO;
+      remove_undo_fn ( s, pos );
+    }
   
 } // end saves_remove_undo_file_name
