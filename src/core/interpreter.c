@@ -1027,8 +1027,7 @@ static bool
 get_object_offset (
                    Interpreter     *intp,
                    const uint16_t   object,
-                   uint32_t        *offset,
-                   char           **err
+                   uint32_t        *offset
                    )
 {
 
@@ -1037,8 +1036,7 @@ get_object_offset (
     {
       if ( object < 1 || object > 255 )
         {
-          msgerror ( err, "Failed to get property address: invalid"
-                     " object index %u", object );
+          ww ( "invalid object index %u", object );
           return false;
         }
       *offset=
@@ -1051,8 +1049,7 @@ get_object_offset (
     {
       if ( object < 1 )
         {
-          msgerror ( err, "Failed to get property address: invalid"
-                     " object index %u", object );
+          ww ( "invalid object index %u", object );
           return false;
         }
       *offset=
@@ -1085,8 +1082,11 @@ get_prop_addr_len (
   
   
   // Obté property pointer
-  if ( !get_object_offset ( intp, object, &property_pointer_offset, err ) )
-    return false;
+  if ( !get_object_offset ( intp, object, &property_pointer_offset ) )
+    {
+      *addr= 0; *len= 0;
+      return true;
+    }
   property_pointer_offset+= (intp->version <= 3) ? 7 : 12;
   if ( !memory_map_READW ( intp->mem, property_pointer_offset,
                            &property_pointer, false, err ) )
@@ -1327,8 +1327,12 @@ get_child (
   
   
   // Obté object offset
-  if ( !get_object_offset ( intp, object, &object_offset, err ) )
-    return false;
+  if ( !get_object_offset ( intp, object, &object_offset ) )
+    {
+      *res= 0;
+      *cond= false;
+      return true;
+    }
   
   // Offset fill.
   if ( intp->version <= 3 )
@@ -1367,8 +1371,11 @@ get_parent (
   
   
   // Obté object offset
-  if ( !get_object_offset ( intp, object, &object_offset, err ) )
-    return false;
+  if ( !get_object_offset ( intp, object, &object_offset ) )
+    {
+      *res= 0;
+      return true;
+    }
   
   // Offset pare.
   if ( intp->version <= 3 )
@@ -1405,8 +1412,11 @@ get_sibling (
   
   
   // Obté object offset
-  if ( !get_object_offset ( intp, object, &object_offset, err ) )
-    return false;
+  if ( !get_object_offset ( intp, object, &object_offset ) )
+    {
+      *res= 0; *cond= false;
+      return true;
+    }
   
   // Offset 'next'.
   if ( intp->version <= 3 )
@@ -1496,8 +1506,11 @@ test_attr (
     }
   
   // Obté object offset
-  if ( !get_object_offset ( intp, object, &object_offset, err ) )
-    return false;
+  if ( !get_object_offset ( intp, object, &object_offset ) )
+    {
+      *ret= false;
+      return true;
+    }
 
   // Comprova atribut.
   offset= object_offset + attr/8;
@@ -1533,8 +1546,8 @@ clear_attr (
     }
   
   // Obté object offset
-  if ( !get_object_offset ( intp, object, &object_offset, err ) )
-    return false;
+  if ( !get_object_offset ( intp, object, &object_offset ) )
+    return true;
   
   // Comprova atribut.
   offset= object_offset + attr/8;
@@ -1572,8 +1585,8 @@ set_attr (
     }
   
   // Obté object offset
-  if ( !get_object_offset ( intp, object, &object_offset, err ) )
-    return false;
+  if ( !get_object_offset ( intp, object, &object_offset ) )
+    return true;
   
   // Comprova atribut.
   offset= object_offset + attr/8;
@@ -1604,26 +1617,30 @@ jin (
   bool is_parent;
   
   
-  // Obté property pointer
-  if ( !get_object_offset ( intp, a, &parent_offset, err ) )
-    return false;
-
-  // Llig parent
-  if ( intp->version <= 3 )
-    {
-      parent_offset+= 4;
-      if ( !memory_map_READB ( intp->mem, parent_offset,
-                               &parent_u8, false, err ) )
-        return false;
-      is_parent= (((uint16_t) parent_u8) == b);
-    }
+  if ( a == 0 && b == 0 )
+    is_parent= true;
+  else if ( !get_object_offset ( intp, a, &parent_offset ) )
+    is_parent= false;
   else
     {
-      parent_offset+= 6;
-      if ( !memory_map_READW ( intp->mem, parent_offset,
-                               &parent_u16, false, err ) )
-        return false;
-      is_parent= (parent_u16 == b);
+  
+      // Llig parent
+      if ( intp->version <= 3 )
+        {
+          parent_offset+= 4;
+          if ( !memory_map_READB ( intp->mem, parent_offset,
+                                   &parent_u8, false, err ) )
+            return false;
+          is_parent= (((uint16_t) parent_u8) == b);
+        }
+      else
+        {
+          parent_offset+= 6;
+          if ( !memory_map_READW ( intp->mem, parent_offset,
+                                   &parent_u16, false, err ) )
+            return false;
+          is_parent= (parent_u16 == b);
+        }
     }
 
   // Bota.
@@ -1649,8 +1666,8 @@ remove_obj (
   
   
   // Obté object offset
-  if ( !get_object_offset ( intp, object, &object_offset, err ) )
-    return false;
+  if ( !get_object_offset ( intp, object, &object_offset ) )
+    return true;
   
   // Obté pare, sibling i fica a null pare
   if ( intp->version <= 3 )
@@ -1686,8 +1703,8 @@ remove_obj (
 
   
   // Elimina node de la llista de fills del pare
-  if ( !get_object_offset ( intp, parent, &object_offset, err ) )
-    return false;
+  if ( !get_object_offset ( intp, parent, &object_offset ) )
+    return true;
   if ( intp->version <= 3 )
     {
 
@@ -1708,8 +1725,8 @@ remove_obj (
       // Cerca i fica a 0
       while ( !stop && p != 0 )
         {
-          if ( !get_object_offset ( intp, parent, &object_offset, err ) )
-            return false;
+          if ( !get_object_offset ( intp, p, &object_offset ) )
+            return true;
           offset= object_offset + 4 + 1;
           if ( !memory_map_READB ( intp->mem, offset, &tmp8, false, err ) )
             return false;
@@ -1743,8 +1760,8 @@ remove_obj (
       // Cerca i fica a 0
       while ( !stop && p != 0 )
         {
-          if ( !get_object_offset ( intp, parent, &object_offset, err ) )
-            return false;
+          if ( !get_object_offset ( intp, p, &object_offset ) )
+            return true;
           offset= object_offset + 6 + 2;
           if ( !memory_map_READW ( intp->mem, offset, &p_next, false, err ) )
             return false;
@@ -1777,13 +1794,13 @@ insert_obj (
   uint8_t tmp8;
   uint16_t next;
   
-
+  
   // Comença llevant-lo del pare.
   if ( !remove_obj ( intp, object, err ) ) return false;
 
   // Modifica destination i obté next
-  if ( !get_object_offset ( intp, destination, &object_offset, err ) )
-    return false;
+  if ( !get_object_offset ( intp, destination, &object_offset ) )
+    return true;
   if ( intp->version <= 3 )
     {
       offset= object_offset + 4 + 2; // child
@@ -1804,8 +1821,8 @@ insert_obj (
     }
 
   // Modifica object
-  if ( !get_object_offset ( intp, object, &object_offset, err ) )
-    return false;
+  if ( !get_object_offset ( intp, object, &object_offset ) )
+    return true;
   if ( intp->version <= 3 )
     {
       offset= object_offset + 4;
@@ -2423,8 +2440,8 @@ print_obj (
   
 
   // Obté property pointer
-  if ( !get_object_offset ( intp, object, &property_pointer_offset, err ) )
-    return false;
+  if ( !get_object_offset ( intp, object, &property_pointer_offset ) )
+    return true;
   property_pointer_offset+= (intp->version <= 3) ? 7 : 12;
   if ( !memory_map_READW ( intp->mem, property_pointer_offset,
                            &property_pointer, false, err ) )
