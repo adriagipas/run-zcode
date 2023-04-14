@@ -82,6 +82,7 @@ get_inst_name (
     case INSTRUCTION_NAME_DIV             : return "div             ";
     case INSTRUCTION_NAME_ERASE_WINDOW    : return "erase_window    ";
     case INSTRUCTION_NAME_GET_CHILD       : return "get_child       ";
+    case INSTRUCTION_NAME_GET_NEXT_PROP   : return "get_next_prop   ";
     case INSTRUCTION_NAME_GET_PARENT      : return "get_parent      ";
     case INSTRUCTION_NAME_GET_PROP        : return "get_prop        ";
     case INSTRUCTION_NAME_GET_PROP_ADDR   : return "get_prop_addr   ";

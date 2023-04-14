@@ -751,7 +751,11 @@ decode_next_inst (
                             INSTRUCTION_NAME_GET_PROP_ADDR, err ) )
         return false;
       break;
-      
+    case 0x13: // get_next_prop
+      if ( !ins_2op_store ( ins, mem, &addr,
+                            INSTRUCTION_NAME_GET_NEXT_PROP, err ) )
+        return false;
+      break;
     case 0x14: // add
       if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_ADD, err ) )
         return false;
@@ -875,7 +879,11 @@ decode_next_inst (
                             INSTRUCTION_NAME_GET_PROP_ADDR, err ) )
         return false;
       break;
-      
+    case 0x33: // get_next_prop
+      if ( !ins_2op_store ( ins, mem, &addr,
+                            INSTRUCTION_NAME_GET_NEXT_PROP, err ) )
+        return false;
+      break;
     case 0x34: // add
       if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_ADD, err ) )
         return false;
@@ -999,7 +1007,11 @@ decode_next_inst (
                             INSTRUCTION_NAME_GET_PROP_ADDR, err ) )
         return false;
       break;
-      
+    case 0x53: // get_next_prop
+      if ( !ins_2op_store ( ins, mem, &addr,
+                            INSTRUCTION_NAME_GET_NEXT_PROP, err ) )
+        return false;
+      break;
     case 0x54: // add
       if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_ADD, err ) )
         return false;
@@ -1123,7 +1135,11 @@ decode_next_inst (
                             INSTRUCTION_NAME_GET_PROP_ADDR, err ) )
         return false;
       break;
-      
+    case 0x73: // get_next_prop
+      if ( !ins_2op_store ( ins, mem, &addr,
+                            INSTRUCTION_NAME_GET_NEXT_PROP, err ) )
+        return false;
+      break;
     case 0x74: // add
       if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_ADD, err ) )
         return false;
@@ -1540,7 +1556,11 @@ decode_next_inst (
       if ( !ins_var_2ops ( ins, INSTRUCTION_NAME_GET_PROP_ADDR, err ) )
         return false;
       break;
-
+    case 0xd3: // get_next_prop
+      if ( !read_var_ops_store ( ins, mem, &addr, false, err ) ) return false;
+      if ( !ins_var_2ops ( ins, INSTRUCTION_NAME_GET_NEXT_PROP, err ) )
+        return false;
+      break;
     case 0xd4: // add
       if ( !read_var_ops_store ( ins, mem, &addr, false, err ) ) return false;
       if ( !ins_var_2ops ( ins, INSTRUCTION_NAME_ADD, err ) ) return false;
