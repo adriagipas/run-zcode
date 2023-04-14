@@ -779,7 +779,13 @@ decode_next_inst (
             return false;
         }
       break;
-      
+    case 0x1a: // call_2n
+      if ( mem->sf_mem[0] >= 5 )
+        {
+          if ( !ins_2op ( ins, mem, &addr, INSTRUCTION_NAME_CALL, err ) )
+            return false;
+        }
+      break;
     case 0x1b: // set_colour
       if ( mem->sf_mem[0] >= 5 )
         {
@@ -897,7 +903,13 @@ decode_next_inst (
             return false;
         }
       break;
-
+    case 0x3a: // call_2n
+      if ( mem->sf_mem[0] >= 5 )
+        {
+          if ( !ins_2op ( ins, mem, &addr, INSTRUCTION_NAME_CALL, err ) )
+            return false;
+        }
+      break;
     case 0x3b: // set_colour
       if ( mem->sf_mem[0] >= 5 )
         {
@@ -1015,7 +1027,13 @@ decode_next_inst (
             return false;
         }
       break;
-
+    case 0x5a: // call_2n
+      if ( mem->sf_mem[0] >= 5 )
+        {
+          if ( !ins_2op ( ins, mem, &addr, INSTRUCTION_NAME_CALL, err ) )
+            return false;
+        }
+      break;
     case 0x5b: // set_colour
       if ( mem->sf_mem[0] >= 5 )
         {
@@ -1133,7 +1151,13 @@ decode_next_inst (
             return false;
         }
       break;
-
+    case 0x7a: // call_2n
+      if ( mem->sf_mem[0] >= 5 )
+        {
+          if ( !ins_2op ( ins, mem, &addr, INSTRUCTION_NAME_CALL, err ) )
+            return false;
+        }
+      break;
     case 0x7b: // set_colour
       if ( mem->sf_mem[0] >= 5 )
         {
@@ -1460,6 +1484,11 @@ decode_next_inst (
       if ( !ins_var_2ops ( ins, INSTRUCTION_NAME_INC_CHK, err ) ) return false;
       if ( !read_branch ( ins, mem, &addr, err ) ) return false;
       break;
+    case 0xc6: // jin
+      if ( !read_var_ops ( ins, mem, &addr, false, err ) ) return false;
+      if ( !ins_var_2ops ( ins, INSTRUCTION_NAME_JIN, err ) ) return false;
+      if ( !read_branch ( ins, mem, &addr, err ) ) return false;
+      break;
       
     case 0xc8: // or
       if ( !read_var_ops_store ( ins, mem, &addr, false, err ) ) return false;
@@ -1469,12 +1498,31 @@ decode_next_inst (
       if ( !read_var_ops_store ( ins, mem, &addr, false, err ) ) return false;
       if ( !ins_var_2ops ( ins, INSTRUCTION_NAME_AND, err ) ) return false;
       break;
-
+    case 0xca: // test_attr
+      if ( !read_var_ops ( ins, mem, &addr, false, err ) ) return false;
+      if ( !ins_var_2ops ( ins, INSTRUCTION_NAME_TEST_ATTR, err ) )
+        return false;
+      if ( !read_branch ( ins, mem, &addr, err ) ) return false;
+      break;
+    case 0xcb: // set_attr
+      if ( !read_var_ops ( ins, mem, &addr, false, err ) ) return false;
+      if ( !ins_var_2ops ( ins, INSTRUCTION_NAME_SET_ATTR, err ) )
+        return false;
+      break;
+    case 0xcc: // clear_attr
+      if ( !read_var_ops ( ins, mem, &addr, false, err ) ) return false;
+      if ( !ins_var_2ops ( ins, INSTRUCTION_NAME_CLEAR_ATTR, err ) )
+        return false;
+      break;
     case 0xcd: // store
       if ( !read_var_ops ( ins, mem, &addr, false, err ) ) return false;
       if ( !ins_var_2ops ( ins, INSTRUCTION_NAME_STORE, err ) ) return false;
       break;
-      
+    case 0xce: // insert_obj
+      if ( !read_var_ops ( ins, mem, &addr, false, err ) ) return false;
+      if ( !ins_var_2ops ( ins, INSTRUCTION_NAME_INSERT_OBJ, err ) )
+        return false;
+      break;
     case 0xcf: // loadw
       if ( !read_var_ops_store ( ins, mem, &addr, false, err ) ) return false;
       if ( !ins_var_2ops ( ins, INSTRUCTION_NAME_LOADW, err ) ) return false;
@@ -1482,6 +1530,15 @@ decode_next_inst (
     case 0xd0: // loadb
       if ( !read_var_ops_store ( ins, mem, &addr, false, err ) ) return false;
       if ( !ins_var_2ops ( ins, INSTRUCTION_NAME_LOADB, err ) ) return false;
+      break;
+    case 0xd1: // get_prop
+      if ( !read_var_ops_store ( ins, mem, &addr, false, err ) ) return false;
+      if ( !ins_var_2ops ( ins, INSTRUCTION_NAME_GET_PROP, err ) ) return false;
+      break;
+    case 0xd2: // get_prop_addr
+      if ( !read_var_ops_store ( ins, mem, &addr, false, err ) ) return false;
+      if ( !ins_var_2ops ( ins, INSTRUCTION_NAME_GET_PROP_ADDR, err ) )
+        return false;
       break;
 
     case 0xd4: // add
@@ -1517,6 +1574,23 @@ decode_next_inst (
         {
           if ( !read_var_ops ( ins, mem, &addr, false, err ) ) return false;
           if ( !ins_call ( ins, mem, err ) ) return false;
+        }
+      break;
+    case 0xdb: // set_colour
+      if ( mem->sf_mem[0] >= 5 )
+        {
+          if ( !read_var_ops_store ( ins, mem, &addr, false, err ) )
+            return false;
+          ins->name= INSTRUCTION_NAME_SET_COLOUR;
+        }
+      break;
+    case 0xdc: // throw
+      if ( mem->sf_mem[0] >= 5 )
+        {
+          if ( !read_var_ops_store ( ins, mem, &addr, false, err ) )
+            return false;
+          if ( !ins_var_2ops ( ins, INSTRUCTION_NAME_THROW, err ) )
+            return false;
         }
       break;
       

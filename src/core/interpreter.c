@@ -2625,7 +2625,7 @@ sread (
        )
 {
 
-  uint16_t text_buf,parse_buf,result;
+  uint16_t text_buf,parse_buf,time,routine,result;
   uint8_t max_letters,current_letters;
   int n,nread,real_max;
   uint8_t buf[SCREEN_INPUT_TEXT_BUF],zc;
@@ -2633,6 +2633,7 @@ sread (
   
   
   // Parseja opcions.
+  time= routine= 0;
   result= 13; // Newline
   if ( nops < 2 || nops > 4 )
     {
@@ -2644,8 +2645,14 @@ sread (
   if ( !op_to_u16 ( intp, &(ops[1]), &parse_buf, err ) ) return false;
   if ( nops > 2 )
     {
-      ee ( "CAL IMPLEMENTAR sread time routine" );
+      if ( !op_to_u16 ( intp, &(ops[2]), &time, err ) ) return false;
+      if ( nops == 4 )
+        {
+          if ( !op_to_u16 ( intp, &(ops[3]), &routine, err ) ) return false;
+        }
     }
+  if ( time != 0 && routine != 0 )
+    ee ( "CAL IMPLEMENTAR sread time routine" );
   
   // Obté capacitat màxima caràcters.
   if ( !memory_map_READB ( intp->mem, text_buf, &max_letters, true, err ) )
@@ -2766,13 +2773,14 @@ read_char (
            )
 {
 
-  uint16_t op1,result;
+  uint16_t op1,time,routine,result;
   int nread;
   uint8_t buf[SCREEN_INPUT_TEXT_BUF];
   
   
   // Parseja opcions.
-  if ( nops != 1 && nops != 3 )
+  time= routine= 0;
+  if ( nops < 1 && nops > 3 )
     {
       msgerror ( err,
                  "Failed to execute read_char: expected between 1"
@@ -2786,11 +2794,17 @@ read_char (
                  " value must be 1, found %u instead", op1 );
       return false;
     }
-  if ( nops == 3 )
+  if ( nops > 1 )
     {
-      ee ( "CAL IMPLEMENTAR read_char time routine" );
+      if ( !op_to_u16 ( intp, &(ops[1]), &time, err ) ) return false;
+      if ( nops == 3 )
+        {
+          if ( !op_to_u16 ( intp, &(ops[2]), &routine, err ) ) return false;
+        }
     }
-
+  if ( time != 0 && routine != 0 )
+    ee ( "CAL IMPLEMENTAR read_char time routine" );
+  
   // Llig caràcter. ¿¿¿ CAL PINTAR EL QUE FIQUE????
   do {
     if ( !screen_read_char ( intp->screen, buf, &nread, err ) )
@@ -3491,9 +3505,21 @@ exec_next_inst (
       if ( !call_routine ( intp, ops, 2, result_var, false, err ) )
         return RET_ERROR;
       break;
-
+    case 0x1a: // call_2n
+      if ( intp->version < 5 ) goto wrong_version;
+      ops[0].type= OP_SMALL;
+      ops[1].type= OP_SMALL;
+      if ( !read_small_small ( intp, &(ops[0].u8.val), &(ops[1].u8.val), err ))
+        return RET_ERROR;
+      if ( !call_routine ( intp, ops, 2, 0, true, err ) ) return RET_ERROR;
+      break;
     case 0x1b: // set_colour
       if ( intp->version < 5 ) goto wrong_version;
+      if ( intp->version == 6 )
+        {
+          msgerror ( err, "@set_colour not implemented in version 6" );
+          return RET_ERROR;
+        }
       if ( !read_small_small ( intp, &op1_u8, &op2_u8, err ) ) return RET_ERROR;
       SET_U8TOU16(op1_u8,op1);
       SET_U8TOU16(op2_u8,op2);
@@ -3670,9 +3696,21 @@ exec_next_inst (
       if ( !call_routine ( intp, ops, 2, result_var, false, err ) )
         return RET_ERROR;
       break;
-      
+    case 0x3a: // call_2n
+      if ( intp->version < 5 ) goto wrong_version;
+      ops[0].type= OP_SMALL;
+      ops[1].type= OP_VARIABLE;
+      if ( !read_small_small ( intp, &(ops[0].u8.val), &(ops[1].u8.val), err ))
+        return RET_ERROR;
+      if ( !call_routine ( intp, ops, 2, 0, true, err ) ) return RET_ERROR;
+      break;
     case 0x3b: // set_colour
       if ( intp->version < 5 ) goto wrong_version;
+      if ( intp->version == 6 )
+        {
+          msgerror ( err, "@set_colour not implemented in version 6" );
+          return RET_ERROR;
+        }
       if ( !read_small_var ( intp, &op1_u8, &op2, err ) ) return RET_ERROR;
       SET_U8TOU16(op1_u8,op1);
       screen_set_colour ( intp->screen,
@@ -3853,9 +3891,21 @@ exec_next_inst (
       if ( !call_routine ( intp, ops, 2, result_var, false, err ) )
         return RET_ERROR;
       break;
-      
+    case 0x5a: // call_2n
+      if ( intp->version < 5 ) goto wrong_version;
+      ops[0].type= OP_VARIABLE;
+      ops[1].type= OP_SMALL;
+      if ( !read_small_small ( intp, &(ops[0].u8.val), &(ops[1].u8.val), err ))
+        return RET_ERROR;
+      if ( !call_routine ( intp, ops, 2, 0, true, err ) ) return RET_ERROR;
+      break;
     case 0x5b: // set_colour
       if ( intp->version < 5 ) goto wrong_version;
+      if ( intp->version == 6 )
+        {
+          msgerror ( err, "@set_colour not implemented in version 6" );
+          return RET_ERROR;
+        }
       if ( !read_var_small ( intp, &op1, &op2_u8, err ) ) return RET_ERROR;
       SET_U8TOU16(op2_u8,op2);
       screen_set_colour ( intp->screen,
@@ -4007,9 +4057,21 @@ exec_next_inst (
       if ( !call_routine ( intp, ops, 2, result_var, false, err ) )
         return RET_ERROR;
       break;
-
+    case 0x7a: // call_2n
+      if ( intp->version < 5 ) goto wrong_version;
+      ops[0].type= OP_VARIABLE;
+      ops[1].type= OP_VARIABLE;
+      if ( !read_small_small ( intp, &(ops[0].u8.val), &(ops[1].u8.val), err ))
+        return RET_ERROR;
+      if ( !call_routine ( intp, ops, 2, 0, true, err ) ) return RET_ERROR;
+      break;
     case 0x7b: // set_colour
       if ( intp->version < 5 ) goto wrong_version;
+      if ( intp->version == 6 )
+        {
+          msgerror ( err, "@set_colour not implemented in version 6" );
+          return RET_ERROR;
+        }
       if ( !read_var_var ( intp, &op1, &op2, err ) ) return RET_ERROR;
       screen_set_colour ( intp->screen,
                           color2true_color ( op1 ),
@@ -4449,6 +4511,12 @@ exec_next_inst (
       if ( !branch ( intp, (int16_t) op1 > (int16_t) op2, err ) )
         return RET_ERROR;
       break;
+    case 0xc6: // jin
+      if ( !read_var_ops ( intp, ops, &nops, 2, false, err ) ) return RET_ERROR;
+      if ( !op_to_u16 ( intp, &(ops[0]), &op1, err ) ) return RET_ERROR;
+      if ( !op_to_u16 ( intp, &(ops[1]), &op2, err ) ) return RET_ERROR;
+      if ( !jin ( intp, op1, op2, err ) ) return RET_ERROR;
+      break;
       
     case 0xc8: // or
       if ( !read_var_ops_store ( intp, ops, &nops, 2,
@@ -4468,7 +4536,25 @@ exec_next_inst (
       res= op1&op2;
       if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
       break;
-
+    case 0xca: // test_attr
+      if ( !read_var_ops ( intp, ops, &nops, 2, false, err ) ) return RET_ERROR;
+      if ( !op_to_u16 ( intp, &(ops[0]), &op1, err ) ) return RET_ERROR;
+      if ( !op_to_u16 ( intp, &(ops[1]), &op2, err ) ) return RET_ERROR;
+      if ( !test_attr ( intp, op1, op2, &cond, err ) ) return RET_ERROR;
+      if ( !branch ( intp, cond, err ) ) return RET_ERROR;
+      break;
+    case 0xcb: // set_attr
+      if ( !read_var_ops ( intp, ops, &nops, 2, false, err ) ) return RET_ERROR;
+      if ( !op_to_u16 ( intp, &(ops[0]), &op1, err ) ) return RET_ERROR;
+      if ( !op_to_u16 ( intp, &(ops[1]), &op2, err ) ) return RET_ERROR;
+      if ( !set_attr ( intp, op1, op2, err ) ) return RET_ERROR;
+      break;
+    case 0xcc: // clear_attr
+      if ( !read_var_ops ( intp, ops, &nops, 2, false, err ) ) return RET_ERROR;
+      if ( !op_to_u16 ( intp, &(ops[0]), &op1, err ) ) return RET_ERROR;
+      if ( !op_to_u16 ( intp, &(ops[1]), &op2, err ) ) return RET_ERROR;
+      if ( !clear_attr ( intp, op1, op2, err ) ) return RET_ERROR;
+      break;
     case 0xcd: // store
       if ( !read_var_ops ( intp, ops, &nops, 2, false, err ) ) return RET_ERROR;
       if ( ops[0].type != OP_SMALL )
@@ -4483,7 +4569,12 @@ exec_next_inst (
         { if ( !read_var ( intp, 0, &tmp16, err ) ) return RET_ERROR; }
       if ( !write_var ( intp, op1_u8, op2, err ) ) return RET_ERROR;
       break;
-
+    case 0xce: // insert_obj
+      if ( !read_var_ops ( intp, ops, &nops, 2, false, err ) ) return RET_ERROR;
+      if ( !op_to_u16 ( intp, &(ops[0]), &op1, err ) ) return RET_ERROR;
+      if ( !op_to_u16 ( intp, &(ops[1]), &op2, err ) ) return RET_ERROR;
+      if ( !insert_obj ( intp, op1, op2, err ) ) return RET_ERROR;
+      break;
     case 0xcf: // loadw
       if ( !read_var_ops_store ( intp, ops, &nops, 2,
                                  false, &result_var, err ) )
@@ -4505,6 +4596,24 @@ exec_next_inst (
       if ( !memory_map_READB ( intp->mem, addr, &res_u8, false, err ) )
         return RET_ERROR;
       SET_U8TOU16(res_u8,res);
+      if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
+      break;
+    case 0xd1: // get_prop
+      if ( !read_var_ops_store ( intp, ops, &nops, 2,
+                                 false, &result_var, err ) )
+        return RET_ERROR;
+      if ( !op_to_u16 ( intp, &(ops[0]), &op1, err ) ) return RET_ERROR;
+      if ( !op_to_u16 ( intp, &(ops[1]), &op2, err ) ) return RET_ERROR;
+      if ( !get_prop ( intp, op1, op2, &res, err ) ) return RET_ERROR;
+      if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
+      break;
+    case 0xd2: // get_prop_addr
+      if ( !read_var_ops_store ( intp, ops, &nops, 2,
+                                 false, &result_var, err ) )
+        return RET_ERROR;
+      if ( !op_to_u16 ( intp, &(ops[0]), &op1, err ) ) return RET_ERROR;
+      if ( !op_to_u16 ( intp, &(ops[1]), &op2, err ) ) return RET_ERROR;
+      if ( !get_prop_addr ( intp, op1, op2, &res, err ) ) return RET_ERROR;
       if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
       break;
 
@@ -4567,6 +4676,27 @@ exec_next_inst (
       if ( intp->version < 5 ) goto wrong_version;
       if ( !read_var_ops ( intp, ops, &nops, 2, false, err ) ) return RET_ERROR;
       if ( !call_routine ( intp, ops, nops, 0, true, err ) ) return RET_ERROR;
+      break;
+    case 0xdb: // set_colour
+      if ( intp->version < 5 ) goto wrong_version;
+      if ( intp->version == 6 )
+        {
+          msgerror ( err, "@set_colour not implemented in version 6" );
+          return RET_ERROR;
+        }
+      if ( !read_var_ops ( intp, ops, &nops, 2, false, err ) ) return RET_ERROR;
+      if ( !op_to_u16 ( intp, &(ops[0]), &op1, err ) ) return RET_ERROR;
+      if ( !op_to_u16 ( intp, &(ops[1]), &op2, err ) ) return RET_ERROR;
+      screen_set_colour ( intp->screen,
+                          color2true_color ( op1 ),
+                          color2true_color ( op2 ) );
+      break;
+    case 0xdc: // throw
+      if ( intp->version < 5 ) goto wrong_version;
+      if ( !read_var_ops ( intp, ops, &nops, 2, false, err ) ) return RET_ERROR;
+      if ( !op_to_u16 ( intp, &(ops[0]), &op1, err ) ) return RET_ERROR;
+      if ( !op_to_u16 ( intp, &(ops[1]), &op2, err ) ) return RET_ERROR;
+      if ( !throw_inst ( intp, op1, op2, err ) ) return RET_ERROR;
       break;
       
     case 0xe0: // call_vs
