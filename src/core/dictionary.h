@@ -38,6 +38,12 @@ typedef struct
 
 typedef struct
 {
+  uint8_t val;
+  int     alph; // -1 vol dir no actiu.
+} DictionaryAlphabetEntry;
+
+typedef struct
+{
 
   // PRIVAT
   MemoryMap       *_mem;
@@ -48,7 +54,6 @@ typedef struct
   uint16_t         _size;
   uint8_t          _text_length;
   int              _real_text_length;
-  uint32_t         _alphabet_table_addr;
   uint8_t          _version;
   
   // token buffer
@@ -58,6 +63,9 @@ typedef struct
     size_t   size;
     uint8_t *v;
   } _token;
+
+  // ZSCII -> Alphabet table
+  DictionaryAlphabetEntry _zscii2alph[256];
   
 } Dictionary;
 

@@ -164,60 +164,28 @@ find_token (
   
   // Codifica.
   // NOTA!!! En realitat en aquest punt sols trobarem minúscules.
-  if ( d->_alphabet_table_addr != 0 )
-    ee ( "CAL IMPLEMENTAR - dictionary - find_token: alphabet table addr" );
   N= 0;
   for ( i= 0; i < d->_token.N; ++i )
     {
       zc= d->_token.v[i];
-      if ( zc >= (uint8_t) 'a' && zc <= (uint8_t) 'z' )
-        buf[N++]= (zc-(uint8_t)'a') + 6;
-      else if ( zc >= (uint8_t) 'A' && zc <= (uint8_t) 'Z' )
+      switch ( d->_zscii2alph[zc].alph )
         {
+        case 0:
+          buf[N++]= d->_zscii2alph[zc].val;
+          break;
+        case 1:
           buf[N++]= d->_version<=2 ? 2 : 4;
-          buf[N++]= (zc-(uint8_t)'A') + 6;
-        }
-      else if ( zc >= (uint8_t) '0' && zc <= (uint8_t) '9' )
-        {
+          buf[N++]= d->_zscii2alph[zc].val;
+          break;
+        case 2:
           buf[N++]= d->_version<=2 ? 3 : 5;
-          buf[N++]= (zc-(uint8_t)'0') + 7 + (d->_version>=1);
-        }
-      else
-        {
+          buf[N++]= d->_zscii2alph[zc].val;
+          break;
+        default: // -1, simplement escapem.
           buf[N++]= d->_version<=2 ? 3 : 5;
-          switch ( zc )
-            {
-            case '.': buf[N++]= 0x11 + (d->_version>=1); break;
-            case ',': buf[N++]= 0x12 + (d->_version>=1); break;
-            case '!': buf[N++]= 0x13 + (d->_version>=1); break;
-            case '?': buf[N++]= 0x14 + (d->_version>=1); break;
-            case '_': buf[N++]= 0x15 + (d->_version>=1); break;
-            case '#': buf[N++]= 0x16 + (d->_version>=1); break;
-            case '\'': buf[N++]= 0x17 + (d->_version>=1); break;
-            case '"': buf[N++]= 0x18 + (d->_version>=1); break;
-            case '/': buf[N++]= 0x19 + (d->_version>=1); break;
-            case '\\': buf[N++]= 0x1a + (d->_version>=1); break;
-            case '-': buf[N++]= 0x1c; break;
-            case ':': buf[N++]= 0x1d; break;
-            case '(': buf[N++]= 0x1e; break;
-            case ')': buf[N++]= 0x1f; break;
-            case '^':
-              if ( d->_version > 1 )
-                {
-                  buf[N++]= 7;
-                  break; // Dins a propòsit
-                }
-            case '<':
-              if ( d->_version == 1 )
-                {
-                  buf[N++]= 0x1b;
-                  break; // Dins a propòsit
-                }
-            default:
-              buf[N++]= 6;
-              buf[N++]= 0x00;
-              buf[N++]= zc;
-            }
+          buf[N++]= 6;
+          buf[N++]= 0x00;
+          buf[N++]= zc;
         }
     }
 
@@ -340,6 +308,182 @@ check_is_wsep (
 } // end check_is_wsep
 
 
+#define SET_ZSCII2ALPH(CHAR,CODE,ALPH)                                  \
+  d->_zscii2alph[(CHAR)].val= (CODE); d->_zscii2alph[(CHAR)].alph= (ALPH)
+
+static void
+init_zscii2alph_default (
+                         Dictionary *d
+                         )
+{
+
+  int i;
+  
+
+  // Valors per defecte.
+  for ( i= 0; i < 256; ++i )
+    {
+      d->_zscii2alph[i].val= 0x00;
+      d->_zscii2alph[i].alph= -1;
+    }
+
+  // Valors ALPH=0
+  SET_ZSCII2ALPH('a',0x06,0);
+  SET_ZSCII2ALPH('b',0x07,0);
+  SET_ZSCII2ALPH('c',0x08,0);
+  SET_ZSCII2ALPH('d',0x09,0);
+  SET_ZSCII2ALPH('e',0x0a,0);
+  SET_ZSCII2ALPH('f',0x0b,0);
+  SET_ZSCII2ALPH('g',0x0c,0);
+  SET_ZSCII2ALPH('h',0x0d,0);
+  SET_ZSCII2ALPH('i',0x0e,0);
+  SET_ZSCII2ALPH('j',0x0f,0);
+  SET_ZSCII2ALPH('k',0x10,0);
+  SET_ZSCII2ALPH('l',0x11,0);
+  SET_ZSCII2ALPH('m',0x12,0);
+  SET_ZSCII2ALPH('n',0x13,0);
+  SET_ZSCII2ALPH('o',0x14,0);
+  SET_ZSCII2ALPH('p',0x15,0);
+  SET_ZSCII2ALPH('q',0x16,0);
+  SET_ZSCII2ALPH('r',0x17,0);
+  SET_ZSCII2ALPH('s',0x18,0);
+  SET_ZSCII2ALPH('t',0x19,0);
+  SET_ZSCII2ALPH('u',0x1a,0);
+  SET_ZSCII2ALPH('v',0x1b,0);
+  SET_ZSCII2ALPH('w',0x1c,0);
+  SET_ZSCII2ALPH('x',0x1d,0);
+  SET_ZSCII2ALPH('y',0x1e,0);
+  SET_ZSCII2ALPH('z',0x1f,0);
+
+  // Valors ALPH=1
+  SET_ZSCII2ALPH('A',0x06,1);
+  SET_ZSCII2ALPH('B',0x07,1);
+  SET_ZSCII2ALPH('C',0x08,1);
+  SET_ZSCII2ALPH('D',0x09,1);
+  SET_ZSCII2ALPH('E',0x0a,1);
+  SET_ZSCII2ALPH('F',0x0b,1);
+  SET_ZSCII2ALPH('G',0x0c,1);
+  SET_ZSCII2ALPH('H',0x0d,1);
+  SET_ZSCII2ALPH('I',0x0e,1);
+  SET_ZSCII2ALPH('J',0x0f,1);
+  SET_ZSCII2ALPH('K',0x10,1);
+  SET_ZSCII2ALPH('L',0x11,1);
+  SET_ZSCII2ALPH('M',0x12,1);
+  SET_ZSCII2ALPH('N',0x13,1);
+  SET_ZSCII2ALPH('O',0x14,1);
+  SET_ZSCII2ALPH('P',0x15,1);
+  SET_ZSCII2ALPH('Q',0x16,1);
+  SET_ZSCII2ALPH('R',0x17,1);
+  SET_ZSCII2ALPH('S',0x18,1);
+  SET_ZSCII2ALPH('T',0x19,1);
+  SET_ZSCII2ALPH('U',0x1a,1);
+  SET_ZSCII2ALPH('V',0x1b,1);
+  SET_ZSCII2ALPH('W',0x1c,1);
+  SET_ZSCII2ALPH('X',0x1d,1);
+  SET_ZSCII2ALPH('Y',0x1e,1);
+  SET_ZSCII2ALPH('Z',0x1f,1);
+
+  // Valors ALPH=2
+  if ( d->_version == 1 )
+    {
+      SET_ZSCII2ALPH('0',0x07,2);
+      SET_ZSCII2ALPH('1',0x08,2);
+      SET_ZSCII2ALPH('2',0x09,2);
+      SET_ZSCII2ALPH('3',0x0a,2);
+      SET_ZSCII2ALPH('4',0x0b,2);
+      SET_ZSCII2ALPH('5',0x0c,2);
+      SET_ZSCII2ALPH('6',0x0d,2);
+      SET_ZSCII2ALPH('7',0x0e,2);
+      SET_ZSCII2ALPH('8',0x0f,2);
+      SET_ZSCII2ALPH('9',0x10,2);
+      SET_ZSCII2ALPH('.',0x11,2);
+      SET_ZSCII2ALPH(',',0x12,2);
+      SET_ZSCII2ALPH('!',0x13,2);
+      SET_ZSCII2ALPH('?',0x14,2);
+      SET_ZSCII2ALPH('_',0x15,2);
+      SET_ZSCII2ALPH('#',0x16,2);
+      SET_ZSCII2ALPH('\'',0x17,2);
+      SET_ZSCII2ALPH('"',0x18,2);
+      SET_ZSCII2ALPH('/',0x19,2);
+      SET_ZSCII2ALPH('\\',0x1a,2);
+      SET_ZSCII2ALPH('<',0x1b,2);
+      SET_ZSCII2ALPH('-',0x1c,2);
+      SET_ZSCII2ALPH(':',0x1d,2);
+      SET_ZSCII2ALPH('(',0x1e,2);
+      SET_ZSCII2ALPH(')',0x1f,2);
+    }
+  else
+    {
+      SET_ZSCII2ALPH(13,0x07,2);
+      SET_ZSCII2ALPH('0',0x08,2);
+      SET_ZSCII2ALPH('1',0x09,2);
+      SET_ZSCII2ALPH('2',0x0a,2);
+      SET_ZSCII2ALPH('3',0x0b,2);
+      SET_ZSCII2ALPH('4',0x0c,2);
+      SET_ZSCII2ALPH('5',0x0d,2);
+      SET_ZSCII2ALPH('6',0x0e,2);
+      SET_ZSCII2ALPH('7',0x0f,2);
+      SET_ZSCII2ALPH('8',0x10,2);
+      SET_ZSCII2ALPH('9',0x11,2);
+      SET_ZSCII2ALPH('.',0x12,2);
+      SET_ZSCII2ALPH(',',0x13,2);
+      SET_ZSCII2ALPH('!',0x14,2);
+      SET_ZSCII2ALPH('?',0x15,2);
+      SET_ZSCII2ALPH('_',0x16,2);
+      SET_ZSCII2ALPH('#',0x17,2);
+      SET_ZSCII2ALPH('\'',0x18,2);
+      SET_ZSCII2ALPH('"',0x19,2);
+      SET_ZSCII2ALPH('/',0x1a,2);
+      SET_ZSCII2ALPH('\\',0x1b,2);
+      SET_ZSCII2ALPH('-',0x1c,2);
+      SET_ZSCII2ALPH(':',0x1d,2);
+      SET_ZSCII2ALPH('(',0x1e,2);
+      SET_ZSCII2ALPH(')',0x1f,2);
+    }
+  
+} // end init_zscii2alph_default
+
+
+static bool
+init_zscii2alph (
+                 Dictionary  *d,
+                 uint32_t     addr,
+                 char       **err
+                 )
+{
+
+  int i,j;
+  uint8_t zc;
+  
+
+  // Valors per defecte.
+  for ( i= 0; i < 256; ++i )
+    {
+      d->_zscii2alph[i].val= 0x00;
+      d->_zscii2alph[i].alph= -1;
+    }
+
+  // Llig la taula
+  for ( i= 0; i < 3; ++i )
+    for ( j= 0; j < 26; ++j, ++addr )
+      {
+        if ( !memory_map_READB ( d->_mem, addr, &zc, false, err ) )
+          return false;
+        if ( i != 2 || (j != 6 && j != 7) )
+          {
+            d->_zscii2alph[zc].val= j+6;
+            d->_zscii2alph[zc].alph= i;
+          }
+      }
+  // Newline
+  d->_zscii2alph[13].val= 0x07;
+  d->_zscii2alph[13].alph= 2;
+
+  return true;
+  
+} // end init_zscii2alph
+
+
 
 
 /**********************/
@@ -367,7 +511,8 @@ dictionary_new (
 {
 
   Dictionary *ret;
-
+  uint32_t alphabet_table_addr;
+  
 
   // Prepara.
   ret= g_new ( Dictionary, 1 );
@@ -382,14 +527,27 @@ dictionary_new (
   ret->_version= mem->sf_mem[0];
   if ( ret->_version >= 5 )
     {
-      ret->_alphabet_table_addr=
+      alphabet_table_addr=
         (((uint32_t) ret->_mem->sf_mem[0x34])<<8) |
         ((uint32_t) ret->_mem->sf_mem[0x35])
         ;
     }
-  else ret->_alphabet_table_addr= 0;
+  else alphabet_table_addr= 0;
+
+  // Inicialitza zscii2alpha
+  if ( alphabet_table_addr == 0 )
+    init_zscii2alph_default ( ret );
+  else
+    {
+      if ( !init_zscii2alph ( ret, alphabet_table_addr, err ) )
+        goto error;
+    }
   
   return ret;
+
+ error:
+  dictionary_free ( ret );
+  return NULL;
   
 } // end dictionary_new
 
