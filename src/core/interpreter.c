@@ -64,6 +64,8 @@
 // 10 milisegons, de moment
 #define TIME_SLEEP 10000
 
+#define CURSOR "\u2588"
+
 
 
 
@@ -2453,6 +2455,9 @@ print_output (
               )
 {
 
+  FILE *f;
+
+  
   // Screen
   if ( (intp->ostreams.active&INTP_OSTREAM_SCREEN)!=0 &&
        (intp->ostreams.active&INTP_OSTREAM_TABLE)==0 )
@@ -2464,9 +2469,10 @@ print_output (
   // Transcript
   if ( (intp->ostreams.active&INTP_OSTREAM_TRANSCRIPT)!=0 )
     {
-      ee ( "print_output - CAL IMPLEMENTAR output stream 2 (transcript)" );
+      f= intp->transcript_fd!=NULL ? intp->transcript_fd : stdout;
+      fprintf ( f, "%s", text );
     }
-
+  
   // Table
   if ( (intp->ostreams.active&INTP_OSTREAM_TABLE)!=0 )
     {
@@ -2680,6 +2686,7 @@ print_table (
 static bool
 print_input_text (
                   Interpreter  *intp,
+                  const bool    partial,
                   char        **err
                   )
 {
@@ -2720,8 +2727,16 @@ print_input_text (
   if ( !text_add ( intp, '\0', err ) ) return false;
   
   // Imprimeix
-  if ( !print_output ( intp, intp->text.v, true, err ) )
-    return false;
+  if ( partial )
+    {
+      if ( !screen_print ( intp->screen, intp->text.v, err ) )
+        return false;
+    }
+  else
+    {
+      if ( !print_output ( intp, intp->text.v, true, err ) )
+        return false;
+    }
   
   return true;
   
@@ -2800,6 +2815,8 @@ sread (
     }
   intp->input_text.N= 0;
   stop= false;
+  if ( !screen_print ( intp->screen, CURSOR, err ) )
+    return false;
   do {
     
     // Mentre tinga exit llegint.
@@ -2832,7 +2849,12 @@ sread (
     if ( changed )
       {
         screen_undo ( intp->screen );
-        if ( !print_input_text ( intp, err ) ) return false;
+        if ( !print_input_text ( intp, stop==false, err ) ) return false;
+        if ( !stop )
+          {
+            if ( !screen_print ( intp->screen, CURSOR, err ) )
+              return false;
+          }
       }
     
     // Espera
@@ -5245,7 +5267,8 @@ interpreter_free (
                   Interpreter *intp
                   )
 {
-
+  
+  if ( intp->transcript_fd != NULL ) fclose ( intp->transcript_fd );
   if ( intp->saves != NULL ) saves_free ( intp->saves );
   if ( intp->std_dict != NULL ) dictionary_free ( intp->std_dict );
   if ( intp->usr_dict != NULL ) dictionary_free ( intp->usr_dict );
@@ -5265,6 +5288,7 @@ Interpreter *
 interpreter_new_from_file_name (
                                 const char      *file_name,
                                 Conf            *conf,
+                                const char      *transcript_fn,
                                 const gboolean   verbose,
                                 Tracer          *tracer,
                                 char           **err
@@ -5290,6 +5314,7 @@ interpreter_new_from_file_name (
   ret->saves= NULL;
   ret->verbose= verbose;
   ret->alph_table.enabled= false;
+  ret->transcript_fd= NULL;
   
   // Obri story file
   ret->sf= story_file_new_from_file_name ( file_name, err );
@@ -5386,6 +5411,20 @@ interpreter_new_from_file_name (
 
   // Register extra chars in screen.
   if ( !register_extra_chars ( ret, err ) ) goto error;
+
+  // Fitxer transcript
+  if ( transcript_fn != NULL )
+    {
+      if ( verbose )
+        ii ( "Creating transcript file: %s", transcript_fn );
+      ret->transcript_fd= fopen ( transcript_fn, "w" );
+      if ( ret->transcript_fd == NULL )
+        {
+          msgerror ( err, "Failed to open transcript file '%s'",
+                     transcript_fn );
+          return false;
+        }
+    }
   
   return ret;
   

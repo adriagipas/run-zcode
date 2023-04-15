@@ -217,7 +217,7 @@ debugger_run (
   if ( tracer == NULL ) goto error;
   if ( verbose )
     ii ( "Loading Z-Code file '%s' ...", zcode_fn );
-  intp= interpreter_new_from_file_name ( zcode_fn, conf, verbose,
+  intp= interpreter_new_from_file_name ( zcode_fn, conf, NULL, verbose,
                                          TRACER(tracer), err );
   if ( intp == NULL ) goto error;
 

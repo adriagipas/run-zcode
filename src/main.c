@@ -66,6 +66,7 @@ struct opts
   gboolean  verbose;
   gboolean  debug;
   gchar    *conf_fn;
+  gchar    *transcript_fn;
   
 };
 
@@ -89,7 +90,8 @@ usage (
     {
       FALSE,  // verbose
       FALSE,  // debug
-      NULL    // conf_fn
+      NULL,   // conf_fn
+      NULL
     };
 
   static GOptionEntry entries[]=
@@ -102,6 +104,8 @@ usage (
       { "conf", 'c', 0, G_OPTION_ARG_STRING, &vals.conf_fn,
         "Specify the configuration file. By default use the"
         " standard configuration file" },
+      { "transcript", 'T', 0, G_OPTION_ARG_STRING, &vals.transcript_fn,
+        "Specify the file used to write the transcription" },
       { NULL }
     };
   
@@ -141,7 +145,8 @@ free_opts (
            struct opts *opts
            )
 {
-  
+
+  g_free ( opts->transcript_fn );
   g_free ( opts->conf_fn );
   
 } // end free_opts
@@ -188,6 +193,7 @@ int main ( int argc, char *argv[] )
   else
     {
       intp= interpreter_new_from_file_name ( args.zcode_fn, conf,
+                                             opts.transcript_fn,
                                              opts.verbose, NULL, &err );
       if ( intp == NULL ) goto error;
       if ( !interpreter_run ( intp, &err ) ) goto error;

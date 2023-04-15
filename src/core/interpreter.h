@@ -29,6 +29,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <stdio.h>
 
 #include "dictionary.h"
 #include "disassembler.h"
@@ -81,6 +82,7 @@ typedef struct
     size_t   N;
     uint8_t *v;  // ZSCII
   }        input_text;
+  FILE    *transcript_fd; 
 
   // Output streams
   struct
@@ -132,6 +134,7 @@ Interpreter *
 interpreter_new_from_file_name (
                                 const char      *file_name,
                                 Conf            *conf,
+                                const char      *transcript_fn, // Pot ser NULL
                                 const gboolean   verbose,
                                 Tracer          *tracer, // Pot ser NULL
                                 char           **err
