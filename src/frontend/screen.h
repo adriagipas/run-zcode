@@ -126,6 +126,7 @@ typedef struct
   SDL_Surface *_render_buf;
   Uint32       _last_redraw_t; // ticks SDL (en millisegons) des de
                                // l'últim repintat amb print.
+  bool         _fb_changed;
   
 } Screen;
 

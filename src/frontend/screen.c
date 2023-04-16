@@ -108,12 +108,17 @@ redraw_fb (
   bool ret;
   Uint32 t;
   
-  
-  t= SDL_GetTicks ();
-  if ( t < s->_last_redraw_t || (t-s->_last_redraw_t) >= REPAINT_TICKS )
+
+  if ( s->_fb_changed )
     {
-      ret= window_update ( s->_win, s->_fb, err );
-      s->_last_redraw_t= t;
+      t= SDL_GetTicks ();
+      if ( t < s->_last_redraw_t || (t-s->_last_redraw_t) >= REPAINT_TICKS )
+        {
+          ret= window_update ( s->_win, s->_fb, err );
+          s->_last_redraw_t= t;
+          s->_fb_changed= false;
+        }
+      else ret= true;
     }
   else ret= true;
   
@@ -847,6 +852,7 @@ screen_new (
   for ( n= 0; n < ret->_width*ret->_height; ++n )
     ret->_fb[n]= color;
   ret->_last_redraw_t= (Uint32) -1;
+  ret->_fb_changed= true;
   if ( !redraw_fb ( ret, err ) ) goto error;
   
   // Altres.
@@ -958,6 +964,7 @@ screen_print (
       return false;
   
   // Actualitza
+  s->_fb_changed= true;
   if ( !redraw_fb ( s, err ) ) return false;
   
   return true;
@@ -1170,6 +1177,7 @@ screen_erase_window (
     ww ( "Cannot erase window %d because it not exist", window );
 
   // Redibuixa
+  screen->_fb_changed= true;
   if ( !redraw_fb ( screen, err ) ) return false;
 
   return true;
