@@ -1003,6 +1003,36 @@ screen_set_style (
 } // end screen_set_style
 
 
+// NOTA!!! Sols s'utilitza en V5
+uint16_t
+screen_set_font (
+                 Screen         *screen,
+                 const uint16_t  font
+                 )
+{
+
+  uint16_t ret;
+
+
+  // Font anterior
+  if ( screen->_current_font == F_NORMAL )
+    ret= 1;
+  else
+    {
+      assert ( screen->_current_font == F_FPITCH );
+      ret= 4;
+    }
+
+  // Fixa
+  if ( font == 1 ) screen->_current_font= F_NORMAL;
+  else if ( font == 4 ) screen->_current_font= F_FPITCH;
+  else if ( font != 0 ) ret= 0; // Si és 0 ignora
+
+  return ret;
+  
+} // end screen_set_font
+
+
 void
 screen_set_colour (
                    Screen         *screen,

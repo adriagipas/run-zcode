@@ -632,7 +632,11 @@ inst_be (
       if ( !ins_var_2ops ( ins, INSTRUCTION_NAME_ART_SHIFT, err ) )
         return false;
       break;
-
+    case 0x04: // set_font
+      if ( !read_var_ops_store ( ins, mem, addr, false, err ) ) return false;
+      ins->name= INSTRUCTION_NAME_SET_FONT;
+      break;
+      
     case 0x09: // save_undo
       if ( !read_var_ops_store ( ins, mem, addr, false, err ) ) return false;
       ins->name= INSTRUCTION_NAME_SAVE_UNDO;

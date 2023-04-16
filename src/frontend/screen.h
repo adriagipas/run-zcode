@@ -157,6 +157,17 @@ screen_set_style (
                   const uint16_t  style
                   );
 
+// 0 - IN: No modifica OUT: Font no disponible
+// 1 - Normal font
+// 2 - Picture font
+// 3 - Character graphics font
+// 4 - Courier-style font
+uint16_t
+screen_set_font (
+                 Screen         *screen,
+                 const uint16_t  font
+                 );
+
 // True colour (Els valors negatius són especials).
 void
 screen_set_colour (

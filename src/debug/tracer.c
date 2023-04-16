@@ -133,6 +133,7 @@ get_inst_name (
     case INSTRUCTION_NAME_SET_ATTR        : return "set_attr        ";
     case INSTRUCTION_NAME_SET_COLOUR      : return "set_colour      ";
     case INSTRUCTION_NAME_SET_CURSOR      : return "set_cursor      ";
+    case INSTRUCTION_NAME_SET_FONT        : return "set_font        ";
     case INSTRUCTION_NAME_SET_TEXT_STYLE  : return "set_text_style  ";
     case INSTRUCTION_NAME_SET_TRUE_COLOUR : return "set_true_colour ";
     case INSTRUCTION_NAME_SET_WINDOW      : return "set_window      ";

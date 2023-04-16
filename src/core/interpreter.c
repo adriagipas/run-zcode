@@ -3392,6 +3392,22 @@ inst_be (
       else                    res= (uint16_t) (((int16_t) op1)>>(-places));
       if ( !write_var ( intp, result_var, res, err ) ) return false;
       break;
+    case 0x04: // set_font
+      if ( intp->version == 6 )
+        {
+          msgerror ( err, "@set_font not implemented in version 6" );
+          return false;
+        }
+      else
+        {
+          if ( !read_var_ops_store ( intp, ops, &nops, 1,
+                                     false, &result_var, err ) )
+            return false;
+          if ( !op_to_u16 ( intp, &(ops[0]), &op1, err ) ) return false;
+          res= screen_set_font ( intp->screen, op1 );
+          if ( !write_var ( intp, result_var, res, err ) ) return false;
+        }
+      break;
 
     case 0x09: // save_undo
       if ( !read_var_ops_store ( intp, ops, &nops, 0,
@@ -4471,7 +4487,6 @@ exec_next_inst (
           return RET_ERROR;
         }
       break;
-      
     case 0xa0: // jz
       if ( !read_op1_var ( intp, &op1, err ) ) return RET_ERROR;
       if ( !branch ( intp, op1 == 0, err ) ) return RET_ERROR;
@@ -4652,7 +4667,6 @@ exec_next_inst (
       if ( !branch ( intp, ((int16_t) op1) > ((int16_t) op2), err ) )
         return RET_ERROR;
       break;
-
     case 0xc4: // dec_chk
       if ( !read_var_ops ( intp, ops, &nops, 2, false, err ) ) return RET_ERROR;
       if ( !op_to_refvar ( intp, &(ops[0]), &op1_u8, err ) )
