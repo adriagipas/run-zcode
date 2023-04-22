@@ -238,6 +238,19 @@ static const uint16_t ZSCII_TO_UNICODE[97]=
 
 
 
+/************************/
+/* DEFINICIONS PRIVADES */
+/************************/
+
+static int
+exec_next_inst (
+                Interpreter  *intp,
+                char        **err
+                );
+
+
+
+
 /*********************/
 /* FUNCIONS PRIVADES */
 /*********************/
@@ -2743,6 +2756,50 @@ print_input_text (
 } // end print_input_text
 
 
+static bool
+sread_call_routine (
+                    Interpreter      *intp,
+                    const uint16_t    routine,
+                    uint16_t         *result,
+                    char            **err
+                    )
+{
+
+  uint32_t old_PC;
+  uint16_t old_frame_ind;
+  int ret_inst;
+  operand_t ops[1];
+  State *state;
+
+  
+  // Desa valors
+  state= intp->state;
+  old_PC= state->PC;
+  old_frame_ind= state->frame_ind;
+  
+  // Crida rutina (Fica en la pila).
+  ops[0].type= OP_LARGE;
+  ops[0].u16.val= routine;
+  if ( !call_routine ( intp, ops, 1, 0, false, err ) )
+    return false;
+
+  // Executa fins que tornem al mateix lloc
+  do {
+    ret_inst= exec_next_inst ( intp, err );
+  } while ( ret_inst == RET_CONTINUE &&
+            state->frame_ind != old_frame_ind );
+  if ( ret_inst != RET_CONTINUE ) return false;
+  assert ( old_PC == state->PC );
+  
+  // Obté resultat
+  if ( !state_readvar ( state, 0, result, true, err ) )
+    return false;
+  
+  return true;
+  
+} // end sread_call_routine
+
+
 // read en verions >=5
 static bool
 sread (
@@ -2754,12 +2811,13 @@ sread (
        )
 {
 
-  uint16_t text_buf,parse_buf,time,routine,result;
+  uint16_t text_buf,parse_buf,time,routine,result,result_routine;
   uint8_t max_letters,current_letters;
   int n,nread,real_max;
   uint8_t buf[SCREEN_INPUT_TEXT_BUF],zc;
-  bool stop,changed;
-  
+  bool stop,changed,call_routine;
+  gint64 time_microsecs,t0,t1,accum_t;
+
   
   // Parseja opcions.
   time= routine= 0;
@@ -2781,7 +2839,13 @@ sread (
         }
     }
   if ( time != 0 && routine != 0 )
-    ee ( "CAL IMPLEMENTAR sread time routine" );
+    {
+      t0= g_get_monotonic_time ();
+      accum_t= 0;
+      call_routine= true;
+      time_microsecs= ((gint64) ((uint64_t) time))*100000;
+    }
+  else call_routine= false;
   
   // Obté capacitat màxima caràcters.
   if ( !memory_map_READB ( intp->mem, text_buf, &max_letters, true, err ) )
@@ -2845,6 +2909,30 @@ sread (
         }
     } while ( nread > 0 && !stop );
 
+    // Rutina
+    if ( call_routine )
+      {
+        t1= g_get_monotonic_time ();
+        accum_t+= t1-t0;
+        t0= t1;
+        while ( accum_t >= time_microsecs && !stop )
+          {
+            accum_t-= time_microsecs;
+            screen_undo ( intp->screen );
+            if ( !sread_call_routine ( intp, routine, &result_routine, err ) )
+              return false;
+            if ( result_routine != 0 )
+              {
+                intp->input_text.N= 0;
+                stop= true;
+                result= 0;
+                changed= false;
+              }
+            else changed= true; // Que torne a pintar
+            screen_set_undo_mark ( intp->screen );
+          }
+      }
+    
     // Repinta
     if ( changed )
       {
@@ -2862,8 +2950,11 @@ sread (
     
   } while ( !stop );
   // --> Pinta retorn carro.
-  if ( !print_output ( intp, "\n", true, err ) )
-    return false;
+  if ( result != 0 )
+    {
+      if ( !print_output ( intp, "\n", true, err ) )
+        return false;
+    }
   
   // Escriu en el text buffer
   if ( !memory_map_WRITEB ( intp->mem, text_buf+1,
@@ -2909,9 +3000,11 @@ read_char (
            )
 {
 
-  uint16_t op1,time,routine,result;
+  uint16_t op1,time,routine,result,result_routine;
   int nread;
   uint8_t buf[SCREEN_INPUT_TEXT_BUF];
+  bool call_routine;
+  gint64 time_microsecs,t0,t1,accum_t;
   
   
   // Parseja opcions.
@@ -2943,12 +3036,43 @@ read_char (
       return false;
     }
   if ( time != 0 && routine != 0 )
-    ee ( "CAL IMPLEMENTAR read_char time routine" );
+    {
+      t0= g_get_monotonic_time ();
+      accum_t= 0;
+      call_routine= true;
+      time_microsecs= ((gint64) ((uint64_t) time))*100000;
+    }
+  else call_routine= false;
   
-  // Llig caràcter. ¿¿¿ CAL PINTAR EL QUE FIQUE????
+  // Llig caràcter.
   do {
+
+    // Caràcter.
     if ( !screen_read_char ( intp->screen, buf, &nread, err ) )
       return false;
+
+    // Crida rutina
+    if ( call_routine )
+      {
+        t1= g_get_monotonic_time ();
+        accum_t+= t1-t0;
+        t0= t1;
+        if ( accum_t >= time_microsecs )
+          {
+            accum_t-= time_microsecs;
+            if ( !sread_call_routine ( intp, routine, &result_routine, err ) )
+              return false;
+            if ( result_routine != 0 )
+              {
+                buf[0]= 0; // '\0'
+                nread= 1;
+              }
+          }
+      }
+    
+    // Força una espera
+    g_usleep ( TIME_SLEEP );
+    
   } while ( nread == 0 );
   result= (uint16_t) buf[0];
   
