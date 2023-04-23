@@ -405,21 +405,18 @@ fonts_char0_width (
                    )
 {
 
-  int i,minx,miny,maxx,maxy,advance,w;
+  int i,w,h;
 
   
   *width= -1;
   for ( i= 0; i < F_NUM_STYLES; ++i )
     {
-      if ( TTF_GlyphMetrics ( f->_fonts[F_FPITCH][i], '0',
-                              &minx, &maxx, &miny, &maxy,
-                              &advance ) )
+      if ( TTF_SizeText ( f->_fonts[F_FPITCH][i], " ", &w, &h ) )
         {
           msgerror ( err, "Failed to estimate char width: %s",
                      SDL_GetError () );
           return false;
         }
-      w= maxx - minx;
       if ( w > *width ) *width= w;
     }
   

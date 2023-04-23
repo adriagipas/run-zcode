@@ -493,6 +493,7 @@ print_line (
           if ( !copy_remain ( c, new_N, err ) ) return false;
           c->text[new_N]= '\0';
           remain= c->text_remain;
+          if ( *remain == ' ' ) ++remain;
         }
       else remain= NULL;
       
@@ -1279,16 +1280,6 @@ screen_set_cursor (
                  " does not support this function" );
       return false;
     }
-  /*
-  if ( x < 1 || x > screen->_width_chars ||
-       y < 1 || y > screen->_upwin_lines )
-    {
-      msgerror ( err,
-                 "Failed to execute set_cursor: invalid position (%d,%d)",
-                 x, y );
-      return false;
-    }
-  */
   
   // Fixa cursor.
   old_x= screen->_cursors[W_UP].x;
