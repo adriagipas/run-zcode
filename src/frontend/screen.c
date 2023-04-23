@@ -1269,6 +1269,9 @@ screen_set_cursor (
                    )
 {
 
+  int old_x,old_line;
+
+  
   // Comprovacions
   if ( screen->_current_win == W_LOW )
     {
@@ -1276,6 +1279,7 @@ screen_set_cursor (
                  " does not support this function" );
       return false;
     }
+  /*
   if ( x < 1 || x > screen->_width_chars ||
        y < 1 || y > screen->_upwin_lines )
     {
@@ -1284,11 +1288,20 @@ screen_set_cursor (
                  x, y );
       return false;
     }
+  */
   
   // Fixa cursor.
+  old_x= screen->_cursors[W_UP].x;
+  old_line= screen->_cursors[W_UP].line;
   reset_cursor ( screen, W_UP );
-  screen->_cursors[W_UP].x= (x-1)*screen->_char_width;
-  screen->_cursors[W_UP].line= y-1;
+  if ( x >= 1 && x <= screen->_width_chars )
+    screen->_cursors[W_UP].x= (x-1)*screen->_char_width;
+  else
+    screen->_cursors[W_UP].x= old_x;
+  if ( y >= 1 && y <= screen->_upwin_lines )
+    screen->_cursors[W_UP].line= y-1;
+  else
+    screen->_cursors[W_UP].line= old_line;
   
   return true;
   

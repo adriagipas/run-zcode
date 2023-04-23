@@ -556,6 +556,16 @@ call_routine (
     return false;
   
   // Descodifica rutina.
+  // --> Cas especial. No fa res i retorna fals.
+  if ( paddr == 0 )
+    {
+      if ( !discard_result )
+        {
+          if ( !write_var ( intp, result_var, 0, err ) )
+            return false;
+        }
+      return true;
+    }
   // --> Adreça real
   addr= unpack_addr ( intp, paddr, true );
   // --> Nombre variables locals
@@ -1057,7 +1067,7 @@ get_object_offset (
       *offset=
         intp->object_table_offset +
         31*2 + // Default properties
-        (object-1)*9
+        ((uint32_t) (object-1))*9
         ;
     }
   else
@@ -2161,6 +2171,25 @@ zscii2utf8 (
             zscii= ((uint16_t) zc)<<5;
             mode= WAIT_ZSCII_LOW;
           }
+
+        // Abbreviatures
+        else if ( abbr_ind != 0 )
+          {
+            if ( is_abbr )
+              {
+                msgerror ( err, "Failed to print abbreviation: "
+                           "found abbreviation inside abbreviation" );
+                return false;
+              }
+            tmp_addr= intp->abbr_table_addr + (32*(abbr_ind-1) + zc)*2;
+            if ( !memory_map_READW ( intp->mem, tmp_addr, &abbr_addr,
+                                     false, err ) )
+              return false;
+            if ( !zscii2utf8 ( intp, ((uint32_t) abbr_addr)<<1, NULL,
+                               false, true, -1, err ) )
+              return false;
+            abbr_ind= 0;
+          }
         
         // Special characters
         else if ( zc < 6 )
@@ -2210,25 +2239,6 @@ zscii2utf8 (
                 else { prev_alph= 0; alph= 2; }
                 break;
               }
-          }
-
-        // Abbreviatures
-        else if ( abbr_ind != 0 )
-          {
-            if ( is_abbr )
-              {
-                msgerror ( err, "Failed to print abbreviation: "
-                           "found abbreviation inside abbreviation" );
-                return false;
-              }
-            tmp_addr= intp->abbr_table_addr + (32*(abbr_ind-1) + zc)*2;
-            if ( !memory_map_READW ( intp->mem, tmp_addr, &abbr_addr,
-                                     false, err ) )
-              return false;
-            if ( !zscii2utf8 ( intp, ((uint32_t) abbr_addr)<<1, NULL,
-                               false, true, -1, err ) )
-              return false;
-            abbr_ind= 0;
           }
         
         // Valors
