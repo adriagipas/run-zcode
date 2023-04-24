@@ -1282,7 +1282,6 @@ screen_set_cursor (
     }
   
   // Fixa cursor.
-  old_x= screen->_cursors[W_UP].x;
   old_line= screen->_cursors[W_UP].line;
   reset_cursor ( screen, W_UP );
   if ( x < 1 || x > screen->_width_chars ||
