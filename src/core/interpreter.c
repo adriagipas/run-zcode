@@ -5155,10 +5155,19 @@ exec_next_inst (
         }
       else
         {
-          if ( !read_var_ops ( intp, ops, &nops, 2, false, err ) )
+          if ( !read_var_ops ( intp, ops, &nops, -1, false, err ) )
             return RET_ERROR;
+          if ( nops < 1 || nops > 2 )
+            {
+              msgerror ( err, "set_cursor wrong number of parameters" );
+              return RET_ERROR;
+            }
           if ( !op_to_u16 ( intp, &(ops[0]), &op1, err ) ) return RET_ERROR;
-          if ( !op_to_u16 ( intp, &(ops[1]), &op2, err ) ) return RET_ERROR;
+          if ( nops == 2 )
+            {
+              if ( !op_to_u16 ( intp, &(ops[1]), &op2, err ) ) return RET_ERROR;
+            }
+          else op2= 0;
           // line column --> x,y (CAL INTERCANVIAR)
           if ( !screen_set_cursor ( intp->screen, (int16_t) op2,
                                     (int16_t) op1, err ) )

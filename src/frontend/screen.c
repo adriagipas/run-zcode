@@ -1197,7 +1197,7 @@ screen_split_window (
   // Teòricament sols es pot splitejar si window == W_LOW, però com en
   // realitat no està definit què fer quan window == W_UP i la
   // documentació continua fer el mateix vaig a ignorar-ho.
-
+  
   // Cas especial on fa un unsplit
   if ( lines == 0 )
     {
@@ -1270,7 +1270,7 @@ screen_set_cursor (
                    )
 {
 
-  int old_x,old_line;
+  int old_line;
 
   
   // Comprovacions
@@ -1285,14 +1285,14 @@ screen_set_cursor (
   old_x= screen->_cursors[W_UP].x;
   old_line= screen->_cursors[W_UP].line;
   reset_cursor ( screen, W_UP );
-  if ( x >= 1 && x <= screen->_width_chars )
-    screen->_cursors[W_UP].x= (x-1)*screen->_char_width;
-  else
-    screen->_cursors[W_UP].x= old_x;
-  if ( y >= 1 && y <= screen->_upwin_lines )
-    screen->_cursors[W_UP].line= y-1;
-  else
+  if ( x < 1 || x > screen->_width_chars ||
+       y < 1 || y > screen->_upwin_lines )
     screen->_cursors[W_UP].line= old_line;
+  else
+    {
+      screen->_cursors[W_UP].x= (x-1)*screen->_char_width;
+      screen->_cursors[W_UP].line= y-1;
+    }
   
   return true;
   
