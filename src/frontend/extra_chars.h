@@ -73,4 +73,11 @@ extra_chars_decode_next_char (
                               int         *end_pos
                               );
 
+// Torna cert si està per a llegir. El valor 0 sempre torna fals.
+bool
+extra_chars_check (
+                   ExtraChars     *ec,
+                   const uint16_t  unicode
+                   );
+
 #endif // __FRONTEND__EXTRA_CHARS_H__

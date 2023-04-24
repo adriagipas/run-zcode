@@ -239,6 +239,16 @@ screen_set_cursor (
                    char      **err
                    );
 
+// input -> que es pot llegir
+// output -> que es pot escriure amb la font actual.
+void
+screen_check_unicode (
+                      Screen         *screen,
+                      const uint16_t  ch,
+                      bool           *output,
+                      bool           *input
+                      );
+
 
 #define screen_ADD_EXTRA_CHAR(SCREEN,UNICODE,ZCODE,ERR)                 \
   (extra_chars_add ( (SCREEN)->_extra_chars, (UNICODE), (ZCODE), (ERR) ))

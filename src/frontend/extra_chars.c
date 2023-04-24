@@ -246,3 +246,20 @@ extra_chars_decode_next_char (
   return ret;
   
 } // end extra_chars_decode_next_char
+
+
+bool
+extra_chars_check (
+                   ExtraChars     *ec,
+                   const uint16_t  unicode
+                   )
+{
+
+  uint8_t zc;
+
+
+  zc= find_char ( ec, unicode );
+
+  return zc!=0;
+  
+} // end extra_chars_check

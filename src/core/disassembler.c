@@ -645,7 +645,14 @@ inst_be (
       if ( !read_var_ops_store ( ins, mem, addr, false, err ) ) return false;
       ins->name= INSTRUCTION_NAME_RESTORE_UNDO;
       break;
-      
+    case 0x0b: // print_unicode
+      if ( !read_var_ops ( ins, mem, addr, false, err ) ) return false;
+      ins->name= INSTRUCTION_NAME_PRINT_UNICODE;
+      break;
+    case 0x0c: // check_unicode
+      if ( !read_var_ops_store ( ins, mem, addr, false, err ) ) return false;
+      ins->name= INSTRUCTION_NAME_CHECK_UNICODE;
+      break;
     case 0x0d: // set_true_colour
       if ( !read_var_ops ( ins, mem, addr, false, err ) ) return false;
       ins->name= INSTRUCTION_NAME_SET_TRUE_COLOUR;
@@ -1453,6 +1460,9 @@ decode_next_inst (
       break;
     case 0xb3: // print_ret
       ins->name= INSTRUCTION_NAME_PRINT_RET;
+      break;
+    case 0xb4: // nop
+      ins->name= INSTRUCTION_NAME_NOP;
       break;
       
     case 0xb8: // ret_popped;

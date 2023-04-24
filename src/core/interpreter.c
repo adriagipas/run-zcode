@@ -2654,6 +2654,29 @@ print_char (
 
 
 static bool
+print_unicode (
+               Interpreter     *intp,
+               const uint16_t   val,
+               char           **err
+               )
+{
+  
+  // Prepara
+  intp->text.N= 0;
+  
+  // Descodifica caràcter
+  if ( !text_add_unicode ( intp, val, err ) ) return false;
+  if ( !text_add ( intp, '\0', err ) ) return false;
+  
+  // Imprimeix
+  if ( !print_output ( intp, intp->text.v, false, err ) ) return false;
+  
+  return true;
+  
+} // end print_unicode
+
+
+static bool
 print_table (
              Interpreter      *intp,
              const operand_t  *ops,
@@ -3494,7 +3517,8 @@ inst_be (
   int16_t places;
   int nops;
   operand_t ops[8];
-
+  bool cond1,cond2;
+  
   
   state= intp->state;
   if ( !memory_map_READB ( intp->mem, state->PC++, &opcode, true, err ) )
@@ -3563,7 +3587,23 @@ inst_be (
         }
       if ( !write_var ( intp, result_var, res, err ) ) return false;
       break;
-
+    case 0x0b: // print_unicode
+      if ( !read_var_ops ( intp, ops, &nops, 1, false,err ) ) return false;
+      if ( !op_to_u16 ( intp, &(ops[0]), &op1, err ) ) return false;
+      if ( !print_unicode ( intp, op1, err ) ) return false;
+      break;
+    case 0x0c: // check_unicode;
+      if ( !read_var_ops_store ( intp, ops, &nops, 1,
+                                 false, &result_var, err ) )
+        return false;
+      if ( !op_to_u16 ( intp, &(ops[0]), &op1, err ) ) return false;
+      screen_check_unicode ( intp->screen, op1, &cond1, &cond2 );
+      res=
+        (cond1 ? 0x1 : 0x0) | // output
+        (cond2 ? 0x2 : 0x0)   // input
+        ;
+      if ( !write_var ( intp, result_var, res, err ) ) return false;
+      break;
     case 0x0d: // set_true_colour
       if ( intp->version == 6 )
         {
@@ -4736,6 +4776,8 @@ exec_next_inst (
       if ( !print ( intp, err ) ) return RET_ERROR;
       if ( !print_output ( intp, "\n", false, err ) ) return RET_ERROR;
       if ( !ret_val ( intp, 1, err ) ) return RET_ERROR;
+      break;
+    case 0xb4: // nop
       break;
       
     case 0xb8: // ret_popped

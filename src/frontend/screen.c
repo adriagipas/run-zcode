@@ -1296,3 +1296,34 @@ screen_set_cursor (
   return true;
   
 } // end screen_set_cursor
+
+
+void
+screen_check_unicode (
+                      Screen         *screen,
+                      const uint16_t  ch,
+                      bool           *output,
+                      bool           *input
+                      )
+{
+
+  ScreenCursor *c;
+
+  
+  // Input.
+  // --> Caràcters bàsics.
+  if ( ch == 0x007f || ch == 0x0008 || ch == 0x000a )
+    *input= true;
+  // --> ASCII
+  else if ( ch >= 32 && ch <= 126 )
+    *input= true;
+  // --> Caràcters extra
+  else
+    *input= extra_chars_check ( screen->_extra_chars, ch );
+
+  // Output.
+  c= &(screen->_cursors[screen->_current_win]);
+  *output= (TTF_GlyphIsProvided
+            ( screen->_fonts->_fonts[c->font][c->style], ch ) != 0);
+  
+} // end screen_check_unicode

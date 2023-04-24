@@ -75,6 +75,7 @@ get_inst_name (
     case INSTRUCTION_NAME_CALL            : return "call            ";
     case INSTRUCTION_NAME_CATCH           : return "catch           ";
     case INSTRUCTION_NAME_CHECK_ARG_COUNT : return "check_arg_count ";
+    case INSTRUCTION_NAME_CHECK_UNICODE   : return "check_unicode   ";
     case INSTRUCTION_NAME_CLEAR_ATTR      : return "clear_attr      ";
     case INSTRUCTION_NAME_COPY_TABLE      : return "copy_table      ";
     case INSTRUCTION_NAME_DEC             : return "dec             ";
@@ -104,6 +105,7 @@ get_inst_name (
     case INSTRUCTION_NAME_MOD             : return "mod             ";
     case INSTRUCTION_NAME_MUL             : return "mul             ";
     case INSTRUCTION_NAME_NEW_LINE        : return "new_line        ";
+    case INSTRUCTION_NAME_NOP             : return "nop             ";
     case INSTRUCTION_NAME_NOT             : return "not             ";
     case INSTRUCTION_NAME_OR              : return "or              ";
     case INSTRUCTION_NAME_OUTPUT_STREAM   : return "output_stream   ";
@@ -115,6 +117,7 @@ get_inst_name (
     case INSTRUCTION_NAME_PRINT_PADDR     : return "print_paddr     ";
     case INSTRUCTION_NAME_PRINT_RET       : return "print_ret       ";
     case INSTRUCTION_NAME_PRINT_TABLE     : return "print_table     ";
+    case INSTRUCTION_NAME_PRINT_UNICODE   : return "print_unicode   ";
     case INSTRUCTION_NAME_PULL            : return "pull            ";
     case INSTRUCTION_NAME_PUSH            : return "push            ";
     case INSTRUCTION_NAME_PUT_PROP        : return "put_prop        ";
