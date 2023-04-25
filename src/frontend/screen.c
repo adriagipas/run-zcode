@@ -1327,3 +1327,22 @@ screen_check_unicode (
             ( screen->_fonts->_fonts[c->font][c->style], ch ) != 0);
   
 } // end screen_check_unicode
+
+
+bool
+screen_show_status_line (
+                         Screen      *screen,
+                         const char  *text,
+                         const bool   is_score_game,
+                         const int    score_hours,
+                         const int    turns_minutes,
+                         char       **err
+                         )
+{
+
+  printf("SCORE_GAME:%d TEXT: [%s] SCORE_HOURS:%d TURNS_MINUTES:%d\n",is_score_game,text,score_hours,turns_minutes);
+  ee ( "CAL_IMPLEMENTAR - screen_show_status_line TODO" );
+  
+  return true;
+  
+} // end screen_show_status_line

@@ -1653,6 +1653,9 @@ decode_next_inst (
         }
       else
         {
+          if ( !read_var_ops ( ins, mem, &addr, false, err ) )
+            return false;
+          ins->name= INSTRUCTION_NAME_READ;
         }
       break;
     case 0xe5: // print_char

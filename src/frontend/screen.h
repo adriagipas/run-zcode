@@ -249,6 +249,16 @@ screen_check_unicode (
                       bool           *input
                       );
 
+bool
+screen_show_status_line (
+                         Screen      *screen,
+                         const char  *text,
+                         const bool   is_score_game,
+                         const int    score_hours,
+                         const int    turns_minutes,
+                         char       **err
+                         );
+
 
 #define screen_ADD_EXTRA_CHAR(SCREEN,UNICODE,ZCODE,ERR)                 \
   (extra_chars_add ( (SCREEN)->_extra_chars, (UNICODE), (ZCODE), (ERR) ))

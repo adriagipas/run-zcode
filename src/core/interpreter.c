@@ -2789,6 +2789,103 @@ print_input_text (
 } // end print_input_text
 
 
+// NOTA!! Sols s'utilitza en versio<=3
+static bool
+show_status_line (
+                  Interpreter  *intp,
+                  char        **err
+                  )
+{
+
+  uint16_t object;
+  uint32_t property_pointer_offset;
+  uint16_t property_pointer,offset,tmp;
+  uint8_t text_length,flags;
+  int length;
+  bool score_game;
+  int score_hours,turns_minutes;
+  
+  
+  // Obté text status (G00).
+  object= memory_map_readvar ( intp->mem, 0 );
+  if ( get_object_offset ( intp, object, &property_pointer_offset ) )
+    {
+      property_pointer_offset+= 7;
+      if ( !memory_map_READW ( intp->mem, property_pointer_offset,
+                               &property_pointer, false, err ) )
+        return false;
+      
+      // Llig grandària text i adreça text.
+      if ( !memory_map_READB ( intp->mem, property_pointer,
+                               &text_length, false, err ) )
+        return false;
+      offset= property_pointer + 1;
+      length= (int) ((uint16_t) text_length);
+      
+      // Imprimeix si hi ha alguna cosa que imprimir.
+      if ( length > 0 )
+        {
+          if ( !zscii2utf8 ( intp, offset, NULL, true, false, length, err ) )
+            return false;
+        }
+    }
+  else // Object no vàlid
+    {
+      ww ( "show_status_line - invalid object %u", object );
+      intp->text.N= 0;
+      if ( !text_add ( intp, '?', err ) ) return false;
+      if ( !text_add ( intp, '?', err ) ) return false;
+      if ( !text_add ( intp, '?', err ) ) return false;
+      if ( !text_add ( intp, '\0', err ) ) return false;
+    }
+
+  // Tipus de joc
+  if ( intp->version <= 2 ) score_game= true;
+  else
+    {
+      if ( !memory_map_READB ( intp->mem, 1, &flags, false, err ) )
+        return false;
+      score_game= (flags&0x1)==0;
+    }
+
+  // Score/hours
+  tmp= memory_map_readvar ( intp->mem, 1 );
+  score_hours= (int) ((int16_t) tmp);
+  if ( score_game )
+    {
+      if ( score_hours < -99 ) score_hours= -99;
+      else if ( score_hours > 999 ) score_hours= 999;
+    }
+  else
+    {
+      if ( score_hours < 0 ) score_hours= 0;
+      else if ( score_hours > 23 ) score_hours= 23;
+    }
+
+  // Turns/Minutes
+  tmp= memory_map_readvar ( intp->mem, 2 );
+  turns_minutes= (int) ((int16_t) tmp);
+  if ( score_game )
+    {
+      if ( turns_minutes < 0 ) turns_minutes= 0;
+      else if ( turns_minutes > 9999 ) turns_minutes= 9999;
+    }
+  else
+    {
+      if ( turns_minutes < 0 ) turns_minutes= 0;
+      else if ( turns_minutes > 59 ) turns_minutes= 59;
+    }
+  
+  // Mostra per pantalla
+  if ( !screen_show_status_line ( intp->screen, intp->text.v, score_game,
+                                  score_hours, turns_minutes, err ) )
+    return false;
+  
+  return true;
+  
+} // end show_status_line
+
+
 static bool
 sread_call_routine (
                     Interpreter      *intp,
@@ -2855,7 +2952,8 @@ sread (
   // Parseja opcions.
   time= routine= 0;
   result= 13; // Newline
-  if ( nops < 2 || nops > 4 )
+  if ( (intp->version >= 4 && (nops < 2 || nops > 4)) ||
+       (intp->version < 4 && nops != 2) )
     {
       msgerror ( err, "(sread) Expected between 2 and 4 operands but %d found",
                  nops );
@@ -2879,6 +2977,12 @@ sread (
       time_microsecs= ((gint64) ((uint64_t) time))*100000;
     }
   else call_routine= false;
+
+  // Status line
+  if ( intp->version <= 3 )
+    {
+      if ( !show_status_line ( intp, err ) ) return false;
+    }
   
   // Obté capacitat màxima caràcters.
   if ( !memory_map_READB ( intp->mem, text_buf, &max_letters, true, err ) )
@@ -3015,8 +3119,11 @@ sread (
     return false;
 
   // Desa valor retorn
-  if ( !write_var ( intp, result_var, result, err ) )
-    return false;
+  if ( intp->version >= 5 )
+    {
+      if ( !write_var ( intp, result_var, result, err ) )
+        return false;
+    }
   
   return true;
   
@@ -5104,8 +5211,10 @@ exec_next_inst (
         }
       else
         {
-          msgerror ( err, "read not implemented in version %d", intp->version );
-          return RET_ERROR;
+          if ( !read_var_ops ( intp, ops, &nops, -1, false, err ) )
+            return RET_ERROR;
+          // S'ignora el result_var
+          if ( !sread ( intp, ops, nops, 0, err ) ) return RET_ERROR;
         }
       break;
     case 0xe5: // print_char
