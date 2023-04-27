@@ -140,6 +140,7 @@ get_inst_name (
     case INSTRUCTION_NAME_SET_TEXT_STYLE  : return "set_text_style  ";
     case INSTRUCTION_NAME_SET_TRUE_COLOUR : return "set_true_colour ";
     case INSTRUCTION_NAME_SET_WINDOW      : return "set_window      ";
+    case INSTRUCTION_NAME_SHOW_STATUS     : return "show_status     ";
     case INSTRUCTION_NAME_SPLIT_WINDOW    : return "split_window    ";
     case INSTRUCTION_NAME_STORE           : return "store           ";
     case INSTRUCTION_NAME_STOREB          : return "storeb          ";

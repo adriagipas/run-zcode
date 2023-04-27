@@ -4913,7 +4913,14 @@ exec_next_inst (
     case 0xbb: // new_line
       if ( !print_output ( intp, "\n", false, err ) ) return RET_ERROR;
       break;
-
+    case 0xbc: // show_status
+      if ( intp->version < 3 ) goto wrong_version;
+      if ( intp->version == 3 ) // >3 com si fora NOP
+        {
+          if ( !show_status_line ( intp, err ) ) return RET_ERROR;
+        }
+      break;
+      
     case 0xbe: // extended
       if ( intp->version < 5 ) goto wrong_version;
       if ( !inst_be ( intp, err ) ) return RET_ERROR;

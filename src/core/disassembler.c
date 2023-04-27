@@ -1478,8 +1478,12 @@ decode_next_inst (
     case 0xba: // quit;
       ins->name= INSTRUCTION_NAME_QUIT;
       break;
-    case 0xbb: // new_line;
+    case 0xbb: // new_line
       ins->name= INSTRUCTION_NAME_NEW_LINE;
+      break;
+    case 0xbc: // show_status
+      if ( mem->sf_mem[0] >= 3 )
+        ins->name= INSTRUCTION_NAME_SHOW_STATUS;
       break;
 
     case 0xbe: // extended
