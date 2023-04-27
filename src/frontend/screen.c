@@ -138,7 +138,7 @@ scroll_low (
   size_t i,j,line_size,end;
 
   
-  fb= s->_fb;
+  fb= s->_fb_draw;
 
   assert ( s->_upwin_lines < s->_lines );
   
@@ -314,7 +314,7 @@ draw_render_buf (
 
   surface= s->_render_buf;
   data= (const uint8_t *) (surface->pixels);
-  fb= s->_fb;
+  fb= s->_fb_draw;
   off= y*s->_width + x;
   for ( r= 0; r < surface->h; ++r )
     {
@@ -729,7 +729,7 @@ erase_window (
   s->_cursors[window].Nc= 0;
 
   // Neteja
-  fb= s->_fb;
+  fb= s->_fb_draw;
   line_size= ((size_t) s->_line_height)*((size_t) s->_width);
   color= true_color_to_u32 ( s, s->_cursors[window].set_bg_color );
   for ( i= beg*line_size, r= beg; r != end; ++r )
@@ -755,6 +755,7 @@ screen_free (
 
 
   SDL_StopTextInput ();
+  g_free ( s->_status_line );
   if ( s->_undo.cursor.text != NULL ) g_free ( s->_undo.cursor.text );
   if ( s->_undo.fb != NULL ) g_free ( s->_undo.fb );
   if ( s->_render_buf != NULL ) SDL_FreeSurface ( s->_render_buf );
@@ -800,6 +801,7 @@ screen_new (
   ret->_extra_chars= NULL;
   ret->_version= version;
   ret->_fb= NULL;
+  ret->_status_line= NULL;
   for ( n= 0; n < 2; ++n )
     {
       ret->_cursors[n].text= NULL;
@@ -830,9 +832,13 @@ screen_new (
     }
   ret->_lines= conf->screen_lines;
   ret->_height= ret->_lines*ret->_line_height;
-  if ( ret->_version <= 3 ) ret->_height+= ret->_line_height;
   ret->_width_chars= conf->screen_width;
   ret->_width= ret->_width_chars*ret->_char_width;
+  if ( ret->_version <= 3 )
+    {
+      ret->_height+= ret->_line_height;
+      ret->_status_line= g_new ( char, ret->_width_chars+1 );
+    }
   if ( ret->_width <= 0 || ret->_height <= 0 )
     {
       msgerror ( err, "Failed to create screen" );
@@ -848,6 +854,9 @@ screen_new (
 
   // Inicialitza framebuffer
   ret->_fb= g_new ( uint32_t, ret->_width*ret->_height );
+  if ( ret->_version <= 3 )
+    ret->_fb_draw= ret->_fb + ret->_width*ret->_line_height;
+  else ret->_fb_draw= ret->_fb;
   ret->_reverse_color= false;
   color= true_color_to_u32 ( ret, C_WHITE );
   for ( n= 0; n < ret->_width*ret->_height; ++n )
@@ -1340,9 +1349,102 @@ screen_show_status_line (
                          )
 {
 
-  printf("SCORE_GAME:%d TEXT: [%s] SCORE_HOURS:%d TURNS_MINUTES:%d\n",is_score_game,text,score_hours,turns_minutes);
-  ee ( "CAL_IMPLEMENTAR - screen_show_status_line TODO" );
+  const char *SCORE= "Score";
+  const char *TURNS= "Turns";
+  
+  int pos,count,remain,text_len;
+  SDL_Color color;
+  SDL_Surface *surface;
+  uint32_t bg_color;
+  SDL_Rect rect;
+  
+  
+  // Genera text
+  // --> Càlcul espai necessari dreta
+  pos= 0;
+  if ( is_score_game )
+    {
+      // Text _ SCORE : _999 TURN : _9999
+      count= strlen ( SCORE ) + strlen ( TURNS ) +
+        4 + // : i espai
+        2 + // espai principi
+        3 + // score
+        4;  // turns
+      remain= screen->_width_chars-count;
+    }
+  else
+    {
+      // Text _ HH:MM
+      count= 1 + 2 + 1 + 2;
+      remain= screen->_width_chars-count;
+    }
+  // --> Còpia text
+  if ( remain >= 3 )
+    {
+      text_len= strlen ( text );
+      if ( text_len <= remain )
+        {
+          for ( ; pos < text_len; ++pos )
+            screen->_status_line[pos]= text[pos];
+          for ( ; pos < remain; ++pos )
+            screen->_status_line[pos]= ' ';
+        }
+      else
+        {
+          for ( ; pos < remain-3; ++pos )
+            screen->_status_line[pos]= text[pos];
+          screen->_status_line[pos++]= '.';
+          screen->_status_line[pos++]= '.';
+          screen->_status_line[pos++]= '.';
+        }
+    }
+  // --> Part dreta
+  if ( count <= screen->_width_chars )
+    {
+      if ( is_score_game )
+        {
+          sprintf ( &(screen->_status_line[pos]),
+                    " %s: %3d %s: %4d",
+                    SCORE, score_hours, TURNS, turns_minutes );
+          pos+= count;
+        }
+      else
+        {
+          sprintf ( &(screen->_status_line[pos]),
+                    " %02d:%02d", score_hours, turns_minutes );
+          pos+= count;
+        }
+    }
+  // --> Tanca
+  for ( ; pos < screen->_width_chars; ++pos )
+    screen->_status_line[pos]= ' ';
+  screen->_status_line[pos]= '\0';
+    
+  // Renderitza
+  surface= NULL;
+  true_color_to_sdlcolor ( C_WHITE, &color );
+  surface= TTF_RenderUTF8_Blended
+    ( screen->_fonts->_fonts[F_FPITCH][F_ROMAN], screen->_status_line, color );
+  if ( surface == NULL ) goto error_render_sdl;
+  bg_color= true_color_to_u32 ( screen, C_BLACK );
+  rect.x= 0; rect.w= screen->_width;
+  rect.y= 0; rect.h= screen->_line_height;
+  if ( SDL_FillRect ( screen->_render_buf, &rect, (Uint32) bg_color ) != 0 )
+    goto error_render_sdl;
+  if ( SDL_BlitSurface ( surface, NULL, screen->_render_buf, &rect ) != 0 )
+    goto error_render_sdl;
+  draw_render_buf ( screen, 0, -screen->_line_height, screen->_width );
+  SDL_FreeSurface ( surface ); surface= NULL;
+
+  // Actualitza
+  screen->_fb_changed= true;
+  if ( !redraw_fb ( screen, err ) ) return false;
   
   return true;
+
+ error_render_sdl:
+  msgerror ( err, "Failed to render status line: %s", SDL_GetError () );
+  if ( surface != NULL ) SDL_FreeSurface ( surface );
+  return false;
   
 } // end screen_show_status_line

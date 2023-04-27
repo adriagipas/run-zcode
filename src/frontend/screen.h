@@ -95,6 +95,7 @@ typedef struct
 
   // Frame buffer
   uint32_t *_fb;
+  uint32_t *_fb_draw;
   bool      _reverse_color;
 
   // Finestres i altres.
@@ -127,6 +128,8 @@ typedef struct
   Uint32       _last_redraw_t; // ticks SDL (en millisegons) des de
                                // l'últim repintat amb print.
   bool         _fb_changed;
+  char        *_status_line; // Buffer per a renderitzar el status
+                             // line.
   
 } Screen;
 
