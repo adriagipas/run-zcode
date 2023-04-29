@@ -2987,7 +2987,8 @@ sread (
   // Obté capacitat màxima caràcters.
   if ( !memory_map_READB ( intp->mem, text_buf, &max_letters, true, err ) )
     return false;
-  if ( max_letters < 3 )
+  if ( (max_letters < 3 && intp->version >= 5) ||
+       (max_letters == 1 && intp->version <= 4) )
     {
       msgerror ( err, "(sread) Text buffer length (%d) less than 3",
                  max_letters);
@@ -2995,16 +2996,20 @@ sread (
     }
   
   // Obté caràcters que hi han actualment en el buffer.
-  if ( !memory_map_READB ( intp->mem, text_buf+1,
-                           &current_letters, true, err ) )
-    return false;
-  if ( current_letters > max_letters )
+  if ( intp->version >= 5 )
     {
-      msgerror ( err, "(sread) Text buffer already contains more text"
-                 " (%u) than allowed (%u)",
-                 current_letters, max_letters );
-      return false;
+      if ( !memory_map_READB ( intp->mem, text_buf+1,
+                               &current_letters, true, err ) )
+        return false;
+      if ( current_letters > max_letters )
+        {
+          msgerror ( err, "(sread) Text buffer already contains more text"
+                     " (%u) than allowed (%u)",
+                     current_letters, max_letters );
+          return false;
+        }
     }
+  else current_letters= 0;
 
   // Llig.
   screen_set_undo_mark ( intp->screen );
@@ -3094,18 +3099,36 @@ sread (
     }
   
   // Escriu en el text buffer
-  if ( !memory_map_WRITEB ( intp->mem, text_buf+1,
-                            current_letters+intp->input_text.N,
-                            true, err ) )
-    return false;
-  for ( n= 0; n < intp->input_text.N; ++n )
+  if ( intp->version >= 5 )
     {
-      if ( !memory_map_WRITEB ( intp->mem,
-                                text_buf + 2 +
-                                ((uint16_t) current_letters) +
-                                ((uint16_t) n),
-                                intp->input_text.v[n],
+      if ( !memory_map_WRITEB ( intp->mem, text_buf+1,
+                                current_letters+intp->input_text.N,
                                 true, err ) )
+        return false;
+      for ( n= 0; n < intp->input_text.N; ++n )
+        {
+          if ( !memory_map_WRITEB ( intp->mem,
+                                    text_buf + 2 +
+                                    ((uint16_t) current_letters) +
+                                    ((uint16_t) n),
+                                    intp->input_text.v[n],
+                                    true, err ) )
+            return false;
+        }
+    }
+  else
+    {
+      for ( n= 0; n < intp->input_text.N; ++n )
+        {
+          if ( !memory_map_WRITEB ( intp->mem,
+                                    text_buf + 1 + ((uint16_t) n),
+                                    intp->input_text.v[n],
+                                    true, err ) )
+            return false;
+        }
+      if ( !memory_map_WRITEB ( intp->mem,
+                                text_buf + 1 + ((uint16_t) n),
+                                0, true, err ) )
         return false;
     }
   /* DEBUG!!!
@@ -3803,7 +3826,12 @@ exec_next_inst (
       SET_U8TOU16(op2_u8,op2);
       if ( !jin ( intp, op1, op2, err ) ) return RET_ERROR;
       break;
-
+    case 0x07: // test
+      if ( !read_small_small ( intp, &op1_u8, &op2_u8, err ) ) return RET_ERROR;
+      SET_U8TOU16(op1_u8,op1);
+      SET_U8TOU16(op2_u8,op2);
+      if ( !branch ( intp, (op1&op2) == op2, err ) ) return RET_ERROR;
+      break;
     case 0x08: // or
       if ( !read_small_small_store ( intp, &op1_u8, &op2_u8, &result_var, err ))
         return RET_ERROR;
@@ -4017,7 +4045,11 @@ exec_next_inst (
       SET_U8TOU16(op1_u8,op1);
       if ( !jin ( intp, op1, op2, err ) ) return RET_ERROR;
       break;
-      
+    case 0x27: // test
+      if ( !read_small_var ( intp, &op1_u8, &op2, err ) ) return RET_ERROR;
+      SET_U8TOU16(op1_u8,op1);
+      if ( !branch ( intp, (op1&op2)==op2, err ) ) return RET_ERROR;
+      break;
     case 0x28: // or
       if ( !read_small_var_store ( intp, &op1_u8, &op2, &result_var, err ) )
         return RET_ERROR;
@@ -4216,7 +4248,11 @@ exec_next_inst (
       SET_U8TOU16(op2_u8,op2);
       if ( !jin ( intp, op1, op2, err ) ) return RET_ERROR;
       break;
-      
+    case 0x47: // test
+      if ( !read_var_small ( intp, &op1, &op2_u8, err ) ) return RET_ERROR;
+      SET_U8TOU16(op2_u8,op2);
+      if ( !branch ( intp, (op1&op2) == op2, err ) ) return RET_ERROR;
+      break;
     case 0x48: // or
       if ( !read_var_small_store ( intp, &op1, &op2_u8, &result_var, err ) )
         return RET_ERROR;
@@ -4403,7 +4439,10 @@ exec_next_inst (
       if ( !read_var_var ( intp, &op1, &op2, err ) ) return RET_ERROR;
       if ( !jin ( intp, op1, op2, err ) ) return RET_ERROR;
       break;
-
+    case 0x67: // test
+      if ( !read_var_var ( intp, &op1, &op2, err ) ) return RET_ERROR;
+      if ( !branch ( intp, (op1&op2) == op2, err ) ) return RET_ERROR;
+      break;
     case 0x68: // or
       if ( !read_var_var_store ( intp, &op1, &op2, &result_var, err ) )
         return RET_ERROR;
@@ -4985,7 +5024,12 @@ exec_next_inst (
       if ( !op_to_u16 ( intp, &(ops[1]), &op2, err ) ) return RET_ERROR;
       if ( !jin ( intp, op1, op2, err ) ) return RET_ERROR;
       break;
-      
+    case 0xc7: // test
+      if ( !read_var_ops ( intp, ops, &nops, 2, false, err ) ) return RET_ERROR;
+      if ( !op_to_u16 ( intp, &(ops[0]), &op1, err ) ) return RET_ERROR;
+      if ( !op_to_u16 ( intp, &(ops[1]), &op2, err ) ) return RET_ERROR;
+      if ( !branch ( intp, (op1&op2) == op2, err ) ) return RET_ERROR;
+      break;
     case 0xc8: // or
       if ( !read_var_ops_store ( intp, ops, &nops, 2,
                                  false, &result_var, err ) )

@@ -679,7 +679,7 @@ dictionary_parse (
     {
       if ( !memory_map_READB ( d->_mem, p, &zc, true, err ) )
         return false;
-      if ( nchars == 0 && zc == ZC_NULL ) stop= true;
+      if ( nchars == -1 && zc == ZC_NULL ) stop= true;
       else if ( zc == ZC_SPACE )
         {
           if ( !parse_token ( d, wpos, parse_buf, &cwords, err ) )

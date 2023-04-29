@@ -146,6 +146,7 @@ get_inst_name (
     case INSTRUCTION_NAME_STOREB          : return "storeb          ";
     case INSTRUCTION_NAME_STOREW          : return "storew          ";
     case INSTRUCTION_NAME_SUB             : return "sub             ";
+    case INSTRUCTION_NAME_TEST            : return "test            ";
     case INSTRUCTION_NAME_TEST_ATTR       : return "test_attr       ";
     case INSTRUCTION_NAME_THROW           : return "throw           ";
     case INSTRUCTION_NAME_TOKENISE        : return "tokenise        ";

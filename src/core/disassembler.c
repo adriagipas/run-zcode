@@ -714,7 +714,10 @@ decode_next_inst (
       if ( !ins_2op_branch ( ins, mem, &addr, INSTRUCTION_NAME_JIN, err ) )
         return false;
       break;
-
+    case 0x07: // test
+      if ( !ins_2op_branch ( ins, mem, &addr, INSTRUCTION_NAME_TEST, err ) )
+        return false;
+      break;
     case 0x08: // or
       if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_OR, err ) )
         return false;
@@ -842,7 +845,10 @@ decode_next_inst (
       if ( !ins_2op_branch ( ins, mem, &addr, INSTRUCTION_NAME_JIN, err ) )
         return false;
       break;
-
+    case 0x27: // test
+      if ( !ins_2op_branch ( ins, mem, &addr, INSTRUCTION_NAME_TEST, err ) )
+        return false;
+      break;
     case 0x28: // or
       if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_OR, err ) )
         return false;
@@ -970,7 +976,10 @@ decode_next_inst (
       if ( !ins_2op_branch ( ins, mem, &addr, INSTRUCTION_NAME_JIN, err ) )
         return false;
       break;
-
+    case 0x47: // test
+      if ( !ins_2op_branch ( ins, mem, &addr, INSTRUCTION_NAME_TEST, err ) )
+        return false;
+      break;
     case 0x48: // or
       if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_OR, err ) )
         return false;
@@ -1098,7 +1107,10 @@ decode_next_inst (
       if ( !ins_2op_branch ( ins, mem, &addr, INSTRUCTION_NAME_JIN, err ) )
         return false;
       break;
-
+    case 0x67: // test
+      if ( !ins_2op_branch ( ins, mem, &addr, INSTRUCTION_NAME_TEST, err ) )
+        return false;
+      break;
     case 0x68: // or
       if ( !ins_2op_store ( ins, mem, &addr, INSTRUCTION_NAME_OR, err ) )
         return false;
@@ -1523,7 +1535,11 @@ decode_next_inst (
       if ( !ins_var_2ops ( ins, INSTRUCTION_NAME_JIN, err ) ) return false;
       if ( !read_branch ( ins, mem, &addr, err ) ) return false;
       break;
-      
+    case 0xc7: // test
+      if ( !read_var_ops ( ins, mem, &addr, false, err ) ) return false;
+      if ( !ins_var_2ops ( ins, INSTRUCTION_NAME_TEST, err ) ) return false;
+      if ( !read_branch ( ins, mem, &addr, err ) ) return false;
+      break;
     case 0xc8: // or
       if ( !read_var_ops_store ( ins, mem, &addr, false, err ) ) return false;
       if ( !ins_var_2ops ( ins, INSTRUCTION_NAME_OR, err ) ) return false;
