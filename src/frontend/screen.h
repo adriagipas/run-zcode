@@ -130,7 +130,9 @@ typedef struct
   bool         _fb_changed;
   char        *_status_line; // Buffer per a renderitzar el status
                              // line.
-  
+  int          _more_counter; // Quan aplega al valor de línies-1 de
+                              // la finestra inferior para d'imprimir
+                              // i mostra un missatge MORE.
 } Screen;
 
 void

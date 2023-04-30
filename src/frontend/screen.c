@@ -174,6 +174,7 @@ new_line (
   // Finestra inferior
   else
     {
+      ++s->_more_counter;
       if ( s->_cursors[W_LOW].line < (s->_lines-1) )
         ++(s->_cursors[W_LOW].line);
       else scroll_low ( s );
@@ -409,6 +410,72 @@ copy_remain (
 } // end copy_remain
 
 
+static bool
+more (
+      Screen              *s,
+      const ScreenCursor  *c,
+      char               **err
+      )
+{
+
+  const char *MORE= "[MORE]";
+  const gulong MORE_SLEEP= 10000; // 10 milisegons
+  
+  SDL_Surface *surface;
+  SDL_Color color;
+  uint32_t bg_color;
+  SDL_Rect rect;
+  uint8_t buf[SCREEN_INPUT_TEXT_BUF];
+  int nread;
+  
+
+  // Marca per a poder desfer el canvi d'imprimir.
+  screen_set_undo_mark ( s );
+
+  // Renderitza text.
+  surface= NULL;
+  true_color_to_sdlcolor ( c->fg_color, &color );
+  surface= TTF_RenderUTF8_Blended
+    ( s->_fonts->_fonts[c->font][c->style], MORE, color );
+  if ( surface == NULL ) goto error_render_sdl;
+  bg_color= true_color_to_u32 ( s, c->bg_color );
+  rect.x= 0; rect.w= s->_width;
+  rect.y= 0; rect.h= s->_line_height;
+  if ( SDL_FillRect ( s->_render_buf, &rect, (Uint32) bg_color ) != 0 )
+    goto error_render_sdl;
+  if ( SDL_BlitSurface ( surface, NULL, s->_render_buf, &rect ) != 0 )
+    goto error_render_sdl;
+  draw_render_buf ( s, c->x, c->line*s->_line_height, s->_width );
+  SDL_FreeSurface ( surface ); surface= NULL;
+  s->_fb_changed= true;
+  if ( !redraw_fb ( s, err ) ) return false;
+      
+  // Espera
+  do {
+    
+    if ( !screen_read_char ( s, buf, &nread, err ) )
+      return false;
+    
+    g_usleep ( MORE_SLEEP );
+    
+  } while ( nread == 0);
+
+  // Torna a l'estat anterior.
+  screen_undo ( s );
+
+  // Reinicialitza comptador
+  s->_more_counter= 0;
+  
+  return true;
+
+ error_render_sdl:
+  msgerror ( err, "Failed to render [MORE]: %s", SDL_GetError () );
+  if ( surface != NULL ) SDL_FreeSurface ( surface );
+  return false;
+  
+} // end more
+
+
 // L'estil del cursor actual ja està actualitzat. El text pot ser ""
 // per a indicar nova línia, o directament una línia de text que no
 // inclou \n.
@@ -437,6 +504,13 @@ print_line (
   // Mentre hi haja text pendent
   while ( remain != NULL )
     {
+
+      // MORE.
+      if ( s->_current_win == W_LOW &&
+           s->_more_counter >= (s->_lines-s->_upwin_lines)-1 )
+        {
+          if ( !more ( s, c, err ) ) return false;
+        }
       
       // Si estem en la upper i baix de tot no fem res
       if ( s->_current_win == W_UP && c->line >= s->_upwin_lines )
@@ -802,6 +876,7 @@ screen_new (
   ret->_version= version;
   ret->_fb= NULL;
   ret->_status_line= NULL;
+  ret->_more_counter= 0;
   for ( n= 0; n < 2; ++n )
     {
       ret->_cursors[n].text= NULL;
@@ -1082,6 +1157,9 @@ screen_read_char (
 
   SDL_Event e;
 
+
+  // Reinicialitza el comptador more.
+  screen->_more_counter= 0;
   
   // Repinta si cal.
   if ( !redraw_fb ( screen, err ) ) return false;
@@ -1170,6 +1248,9 @@ screen_erase_window (
                      )
 {
 
+  // Reinicia comptador more.
+  screen->_more_counter= 0;
+  
   // Neteja
   if ( window == -2 ) // Neteja les dos finestres
     {
@@ -1184,7 +1265,7 @@ screen_erase_window (
   else if ( window == W_UP || window == W_LOW )
     erase_window ( screen, window );
   else
-    ww ( "Cannot erase window %d because it not exist", window );
+    ww ( "Cannot erase window %d because it does not exist", window );
 
   // Redibuixa
   screen->_fb_changed= true;
@@ -1206,6 +1287,9 @@ screen_split_window (
   // Teòricament sols es pot splitejar si window == W_LOW, però com en
   // realitat no està definit què fer quan window == W_UP i la
   // documentació continua fer el mateix vaig a ignorar-ho.
+
+  // Reinicia comptador more.
+  screen->_more_counter= 0;
   
   // Cas especial on fa un unsplit
   if ( lines == 0 )
