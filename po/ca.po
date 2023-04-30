@@ -2,7 +2,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: run-zcode\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2023-04-30 23:36+0200\n"
+"POT-Creation-Date: 2023-04-30 23:56+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -14,3 +14,7 @@ msgstr ""
 #: src/frontend/screen.c:441
 msgid "[MORE]"
 msgstr "[MÉS]"
+
+#: src/core/interpreter.c:3653
+msgid "[Press any key to exit]"
+msgstr "[Premeu qualsevol tecla per eixir]"

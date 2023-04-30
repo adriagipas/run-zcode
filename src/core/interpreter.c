@@ -25,6 +25,7 @@
 
 #include <assert.h>
 #include <glib.h>
+#include <libintl.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -43,6 +44,8 @@
 /**********/
 /* MACROS */
 /**********/
+
+#define _(String) gettext (String)
 
 #define RET_CONTINUE 0
 #define RET_STOP     1
@@ -3635,6 +3638,38 @@ color2true_color (
 
 
 static bool
+quit (
+      Interpreter  *intp,
+      char        **err
+      )
+{
+
+  int nread;
+  uint8_t buf[SCREEN_INPUT_TEXT_BUF];
+  
+  
+  if ( !screen_print ( intp->screen, "\n", err ) )
+    return false;
+  if ( !screen_print ( intp->screen, _("[Press any key to exit]"), err ) )
+    return false;
+  
+  do {
+    
+    // Caràcter.
+    if ( !screen_read_char ( intp->screen, buf, &nread, err ) )
+      return false;
+    
+    // Força una espera
+    g_usleep ( TIME_SLEEP );
+    
+  } while ( nread == 0 );
+  
+  return true;
+  
+} // end quit
+
+
+static bool
 inst_be (
          Interpreter  *intp,
          char        **err
@@ -4947,6 +4982,7 @@ exec_next_inst (
         }
       break;
     case 0xba: // quit
+      if ( !quit ( intp, err ) ) return RET_ERROR;
       return RET_STOP;
       break;
     case 0xbb: // new_line
