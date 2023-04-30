@@ -7,4 +7,5 @@ SDL2= dependency('sdl2')
 SDL2TTF= dependency('SDL2_ttf')
 
 # Compila
+subdir('po')
 subdir('src')

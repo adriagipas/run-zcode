@@ -1,0 +1,3 @@
+#: src/frontend/screen.c:441
+msgid "[MORE]"
+msgstr "[MÉS]"

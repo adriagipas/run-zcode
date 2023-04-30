@@ -25,6 +25,7 @@
 
 #include <assert.h>
 #include <glib.h>
+#include <libintl.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdlib.h>
@@ -56,6 +57,8 @@
 #define W_LOW 0
 
 #define REPAINT_TICKS 20 // 50 FPS
+
+#define _(String) gettext (String)
 
 
 
@@ -418,7 +421,6 @@ more (
       )
 {
 
-  const char *MORE= "[MORE]";
   const gulong MORE_SLEEP= 10000; // 10 milisegons
   
   SDL_Surface *surface;
@@ -436,7 +438,7 @@ more (
   surface= NULL;
   true_color_to_sdlcolor ( c->fg_color, &color );
   surface= TTF_RenderUTF8_Blended
-    ( s->_fonts->_fonts[c->font][c->style], MORE, color );
+    ( s->_fonts->_fonts[c->font][c->style], _("[MORE]"), color );
   if ( surface == NULL ) goto error_render_sdl;
   bg_color= true_color_to_u32 ( s, c->bg_color );
   rect.x= 0; rect.w= s->_width;
