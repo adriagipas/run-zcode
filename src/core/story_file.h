@@ -32,6 +32,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+// Grandària RELEASE . SERIAL . MD5
+#define STORY_FILE_IDSIZE (5 + 1 + 6 + 1 + 32 + 1)
+
 typedef enum {
   STORY_FILE_RESOURCE_PICTURE_PNG= 0,
   STORY_FILE_RESOURCE_PICTURE_JPEG,
@@ -66,6 +69,8 @@ typedef struct
                                    // "portada". Sempre serà de tipus
                                    // 'PICTURE'. Si el seu valor es >=
                                    // Nres vol dir que no hi ha.
+  char               id[STORY_FILE_IDSIZE]; // Identificador.
+  
 } StoryFile;
 
 
@@ -91,5 +96,8 @@ story_file_read_resource (
                           uint8_t         *mem,
                           char           **err
                           );
+
+// ID del StoryFile
+#define story_file_GETID(SF) ((SF)->id)
 
 #endif // __CORE__STORY_FILE_H__

@@ -23,6 +23,7 @@
  */
 
 #include <assert.h>
+#include <ctype.h>
 #include <glib.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -588,6 +589,47 @@ new_from_blorb (
 } // end new_from_blorb
 
 
+static void
+build_id (
+          StoryFile *sf
+          )
+{
+
+  int i;
+  uint16_t release;
+  char serial[7],c;
+  gchar *chk;
+  size_t len;
+  
+  
+  // HEX_RELEASE
+  release= (((uint16_t) sf->data[2])<<8) | ((uint16_t) sf->data[3]);
+
+  // Serial code/number
+  for ( i= 0; i < 6; ++i )
+    {
+      c= (char) (sf->data[0x12+i]);
+      if ( !isalnum ( c ) ) c= '_';
+      serial[i]= c;
+    }
+  serial[i]= '\0';
+
+  // MD5
+  chk= g_compute_checksum_for_data ( G_CHECKSUM_MD5,
+                                     (const guchar *) sf->data,
+                                     sf->size );
+  len= strlen ( chk );
+  assert ( len == 32 );
+
+  // Còpia.
+  sprintf ( sf->id, "%u.%s.%s", release, serial, chk );
+  
+  // Allibera memòria.
+  g_free ( chk );
+  
+} // end build_id
+
+
 
 
 /**********************/
@@ -650,6 +692,9 @@ story_file_new_from_file_name (
     ret= new_from_blorb ( file_name, err );
   else
     ret= new_from_zfile ( file_name, err );
+
+  // Crea id
+  build_id ( ret );
   
   return ret;
   
