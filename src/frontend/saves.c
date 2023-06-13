@@ -65,6 +65,34 @@ remove_undo_fn (
 } // end remove_undo_fn
 
 
+// Obté el nom del fitxer. S'ha d'esborrar
+static gchar *
+get_save_slot_name (
+                    Saves      *s,
+                    const char *name,
+                    const int   num
+                    )
+{
+
+  GString *buffer;
+  gchar *ret;
+  
+  
+  // Crea el nom del fitxer.
+  buffer= g_string_new ( NULL );
+  g_string_printf ( buffer, "%s.slot%d.sav", name, num );
+
+  // Nom que torna.
+  ret= g_build_filename ( s->_savedir, buffer->str, NULL );
+
+  // Allibera memòria.
+  g_string_free ( buffer, FALSE );
+  
+  return ret;
+  
+} // end get_save_slot_name
+
+
 
 
 /**********************/
@@ -80,6 +108,7 @@ saves_free (
   int n;
 
 
+  g_free ( s->_savedir );
   for ( n= 0; n < SAVES_MAX_UNDO; ++n )
     if ( s->_undo_fn[n] != NULL )
       {
@@ -108,6 +137,13 @@ saves_new (
   ret->_pos= 0;
   for ( n= 0; n < SAVES_MAX_UNDO; ++n )
     ret->_undo_fn[n]= NULL;
+  ret->_savedir= NULL;
+
+  // Savedir
+  ret->_savedir= g_build_path ( G_DIR_SEPARATOR_S,
+                                g_get_user_data_dir (),
+                                "run-zcode", "savs", NULL );
+  g_mkdir_with_parents ( ret->_savedir, 0755 );
   
   return ret;
   

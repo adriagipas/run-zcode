@@ -40,6 +40,7 @@ typedef struct
   gchar    *_undo_fn[SAVES_MAX_UNDO];
   int       _N_undo;
   int       _pos; // Principi de la llista
+  gchar    *_savedir;
   
 } Saves;
 
