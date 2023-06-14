@@ -25,6 +25,7 @@
 
 #include <assert.h>
 #include <errno.h>
+#include <gio/gio.h>
 #include <glib.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -91,6 +92,55 @@ get_save_slot_name (
   return ret;
   
 } // end get_save_slot_name
+
+
+// Torna la data de modificació del fitxer o NULL si no existeix o no
+// és un fitxer regular.
+static GDateTime *
+get_path_datetime (
+                   const gchar *path
+                   )
+{
+
+  GFile *f;
+  GFileInfo *info;
+  GDateTime *ret;
+  
+
+  // Prepara
+  f= NULL;
+  info= NULL;
+
+  // Obté
+  f= g_file_new_for_path ( path );
+  info= g_file_query_info ( f,
+                            "access::can-read,access::can-write,"
+                            "owner::user,"
+                            "time::modified,"
+                            "standard::*",
+                            G_FILE_QUERY_INFO_NONE,
+                            NULL, NULL );
+  if ( info == NULL ) goto error;
+  if ( g_file_info_get_file_type ( info ) != G_FILE_TYPE_REGULAR )
+    goto error;
+  if ( g_file_info_get_is_backup ( info ) ||
+       g_file_info_get_is_hidden ( info ) ||
+       g_file_info_get_is_symlink ( info ) )
+    goto error;
+  ret= g_file_info_get_modification_date_time ( info );
+
+  // Allibera memòria
+  g_object_unref ( info );
+  g_object_unref ( f );
+  
+  return ret;
+  
+ error:
+  if ( info != NULL ) g_object_unref ( info );
+  if ( f != NULL ) g_object_unref ( f );
+  return NULL;
+  
+} // end get_path_datetime
 
 
 
