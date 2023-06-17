@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: run-zcode\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2023-04-30 23:56+0200\n"
+"POT-Creation-Date: 2023-06-17 21:07+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -17,10 +17,18 @@ msgstr ""
 "Content-Type: text/plain; charset=CHARSET\n"
 "Content-Transfer-Encoding: 8bit\n"
 
+#: src/frontend/saves.c:188
+msgid "--EMPTY--"
+msgstr ""
+
+#: src/frontend/saves.c:226
+msgid "Choose a save slot:\n"
+msgstr ""
+
 #: src/frontend/screen.c:441
 msgid "[MORE]"
 msgstr ""
 
-#: src/core/interpreter.c:3653
+#: src/core/interpreter.c:3729
 msgid "[Press any key to exit]"
 msgstr ""
