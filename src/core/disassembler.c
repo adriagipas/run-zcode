@@ -621,7 +621,14 @@ inst_be (
   ins->bytes[ins->nbytes++]= opcode;
   switch ( opcode )
     {
-
+    case 0x00: // save
+      if ( !read_var_ops_store ( ins, mem, addr, false, err ) ) return false;
+      ins->name= INSTRUCTION_NAME_SAVE;
+      break;
+    case 0x01: // restore
+      if ( !read_var_ops_store ( ins, mem, addr, false, err ) ) return false;
+      ins->name= INSTRUCTION_NAME_RESTORE;
+      break;
     case 0x02: // log_shift
       if ( !read_var_ops_store ( ins, mem, addr, false, err ) ) return false;
       if ( !ins_var_2ops ( ins, INSTRUCTION_NAME_LOG_SHIFT, err ) )
@@ -1475,6 +1482,31 @@ decode_next_inst (
       break;
     case 0xb4: // nop
       ins->name= INSTRUCTION_NAME_NOP;
+      break;
+    case 0xb5: // save
+      if ( mem->sf_mem[0] < 4 )
+        {
+          ins->name= INSTRUCTION_NAME_SAVE;
+          if ( !read_branch ( ins, mem, &addr, err ) ) return false;
+        }
+      else if ( mem->sf_mem[0] == 4 )
+        {
+          if ( !ins_0op_store ( ins, mem, &addr, INSTRUCTION_NAME_SAVE, err ) )
+            return false;
+        }
+      break;
+    case 0xb6: // restore
+      if ( mem->sf_mem[0] < 4 )
+        {
+          ins->name= INSTRUCTION_NAME_RESTORE;
+          if ( !read_branch ( ins, mem, &addr, err ) ) return false;
+        }
+      else if ( mem->sf_mem[0] == 4 )
+        {
+          if ( !ins_0op_store ( ins, mem, &addr,
+                                INSTRUCTION_NAME_RESTORE, err ) )
+            return false;
+        }
       break;
       
     case 0xb8: // ret_popped;

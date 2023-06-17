@@ -3279,6 +3279,44 @@ save_undo (
 
 
 static uint16_t
+save (
+      Interpreter      *intp,
+      const operand_t  *ops,
+      const int         nops
+      )
+{
+
+  char *err;
+  gchar *save_fn;
+  
+
+  if ( nops > 0 )
+    {
+      ee ( "save - CAL IMPLEMENTAR table bytes" );
+    }
+  
+  err= NULL;
+  save_fn= saves_get_save_file_name ( intp->saves, intp->screen,
+                                      story_file_GETID ( intp->sf ),
+                                      &err );
+  if ( save_fn == NULL ) goto error;
+  if ( intp->verbose )
+    ii ( "Writing save file: '%s'", save_fn );
+  if ( !state_save ( intp->state, save_fn, &err ) ) goto error;
+  g_free ( save_fn );
+  
+  return 1;
+  
+ error:
+  ww ( "Failed to save: %s", err );
+  g_free ( err );
+  g_free ( save_fn );
+  return 0;
+  
+} // end save
+
+
+static uint16_t
 restore_undo (
               Interpreter *intp
               )
@@ -3308,6 +3346,44 @@ restore_undo (
   return 2;
   
 } // end restore_undo
+
+
+static uint16_t
+restore (
+         Interpreter      *intp,
+         const operand_t  *ops,
+         const int         nops
+         )
+{
+
+  char *err;
+  gchar *save_fn;
+  
+
+  if ( nops > 0 )
+    {
+      ee ( "restore - CAL IMPLEMENTAR table bytes" );
+    }
+  
+  err= NULL;
+  save_fn= saves_get_save_file_name ( intp->saves, intp->screen,
+                                      story_file_GETID ( intp->sf ),
+                                      &err );
+  if ( save_fn == NULL ) goto error;
+  if ( intp->verbose )
+    ii ( "Reading save file: '%s'", save_fn );
+  if ( !state_load ( intp->state, save_fn, &err ) ) goto error;
+  g_free ( save_fn );
+  
+  return 2;
+  
+ error:
+  ww ( "Failed to restore: %s", err );
+  g_free ( err );
+  g_free ( save_fn );
+  return 0;
+  
+} // end restore
 
 
 static bool
@@ -3690,7 +3766,26 @@ inst_be (
     return false;
   switch ( opcode )
     {
-
+    case 0x00: // save
+      if ( !read_var_ops_store ( intp, ops, &nops, -1,
+                                 false, &result_var, err ) )
+        return false;
+      res= save ( intp, ops, nops );
+      if ( !write_var ( intp, result_var, res, err ) ) return false;
+      break;
+    case 0x01: // restore
+      if ( !read_var_ops_store ( intp, ops, &nops, -1,
+                                 false, &result_var, err ) )
+        return false;
+      res= restore ( intp, ops, nops );
+      if ( res == 2 ) // Exit
+        {
+          if ( !memory_map_READB ( intp->mem, intp->state->PC-1,
+                                   &result_var, true, err ) )
+            return false;
+        }
+      if ( !write_var ( intp, result_var, res, err ) ) return false;
+      break;
     case 0x02: // log_shift
       if ( !read_var_ops_store ( intp, ops, &nops, 2,
                                  false, &result_var, err ) )
@@ -4959,6 +5054,44 @@ exec_next_inst (
       if ( !ret_val ( intp, 1, err ) ) return RET_ERROR;
       break;
     case 0xb4: // nop
+      break;
+    case 0xb5: // save
+      if ( intp->version < 4 )
+        {
+          res= save ( intp, ops, 0 );
+          if ( !branch ( intp, res==1, err ) ) return RET_ERROR;
+        }
+      else if ( intp->version == 4 )
+        {
+          if ( !memory_map_READB ( intp->mem, intp->state->PC++,
+                                   &result_var, true, err ) )
+            return RET_ERROR;
+          res= save ( intp, ops, 0 );
+          if ( !write_var ( intp, result_var, res, err ) ) return false;
+        }
+      else goto wrong_version;
+      break;
+    case 0xb6: // restore
+      if ( intp->version < 4 )
+        {
+          res= restore ( intp, ops, 0 );
+          if ( !branch ( intp, res==2, err ) ) return RET_ERROR;
+        }
+      else if ( intp->version == 4 )
+        {
+          if ( !memory_map_READB ( intp->mem, intp->state->PC++,
+                                   &result_var, true, err ) )
+            return RET_ERROR;
+          res= restore ( intp, ops, 0 );
+          if ( res == 2 )
+            {
+              if ( !memory_map_READB ( intp->mem, intp->state->PC-1,
+                                       &result_var, true, err ) )
+                return RET_ERROR;
+            }
+          if ( !write_var ( intp, result_var, res, err ) ) return false;
+        }
+      else goto wrong_version;
       break;
       
     case 0xb8: // ret_popped

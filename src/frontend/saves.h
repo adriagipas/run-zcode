@@ -30,6 +30,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "screen.h"
+
 #define SAVES_MAX_UNDO 10
 
 typedef struct
@@ -74,5 +76,15 @@ void
 saves_remove_last_undo_file_name (
                                   Saves *s
                                   );
+
+// NULL en cas d'error. S'ha d'alliberar memòria. La pantalla és on es
+// va a preguntar a l'usuari.
+gchar *
+saves_get_save_file_name (
+                          Saves       *s,
+                          Screen      *screen,
+                          const char  *id,
+                          char       **err
+                          );
 
 #endif // __FRONTEND__SAVES_H__

@@ -27,6 +27,7 @@
 #include <errno.h>
 #include <gio/gio.h>
 #include <glib.h>
+#include <libintl.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -37,6 +38,19 @@
 #include "saves.h"
 #include "utils/log.h"
 #include "utils/error.h"
+
+
+
+
+/**********/
+/* MACROS */
+/**********/
+
+#define _(String) gettext (String)
+
+#define NSLOTS 5
+
+#define TIME_SLEEP 10000
 
 
 
@@ -141,6 +155,97 @@ get_path_datetime (
   return NULL;
   
 } // end get_path_datetime
+
+
+static bool
+print_save_slots (
+                  Saves       *s,
+                  Screen      *screen,
+                  const char  *id,
+                  char       **err
+                  )
+{
+
+  int i;
+  gchar *slot, *date;
+  char buf[10];
+  GDateTime *dt;
+  
+
+  for ( i= 1; i <= NSLOTS; ++i )
+    {
+
+      // Número
+      sprintf ( buf, " (%d) ", i );
+      if ( !screen_print ( screen, buf, err ) )
+        return false;
+
+      // Buit o data
+      slot= get_save_slot_name ( s, id, i );
+      dt= get_path_datetime ( slot  );
+      if ( dt == NULL )
+        {
+          if ( !screen_print ( screen, _("--EMPTY--"), err ) )
+            return false;
+        }
+      else
+        {
+          date= g_date_time_format ( dt, "\%x (%X)" );
+          if ( !screen_print ( screen, date, err ) )
+            return false;
+          g_free ( date );
+          g_date_time_unref ( dt );
+        }
+      g_free ( slot );
+
+      // Bot de línia
+      if ( !screen_print ( screen, "\n", err ) )
+        return false;
+      
+    }
+  
+  return true;
+  
+} // end print_save_slots
+
+
+// Torna -1 per a indicar error, 0 que no s'ha seleccionat res.
+static int
+select_save_slot (
+                  Saves       *s,
+                  Screen      *screen,
+                  const char  *id,
+                  char       **err
+                  )
+{
+
+  uint8_t buf[SCREEN_INPUT_TEXT_BUF],zc;
+  int nread,ret;
+
+  
+  if ( !screen_print ( screen, _("Choose a save slot:\n"), err ) )
+    return -1;
+  if ( !print_save_slots ( s, screen, id, err ) )
+    return -1;
+  do {
+    if ( !screen_read_char ( screen, buf, &nread, err ) )
+      return -1;
+    g_usleep ( TIME_SLEEP );
+  } while ( nread == 0 );
+  if ( nread == 1 )
+    {
+      zc= buf[0];
+      if ( zc >= '1' && zc <= ('0'+NSLOTS) )
+        ret= zc-'0';
+      else if ( zc >= 146 && zc <= (145+NSLOTS) )
+        ret= zc-145;
+      else ret= 0;
+    }
+  else ret= 0;
+  
+  return ret;
+  
+} // end select_save_slot
 
 
 
@@ -299,3 +404,28 @@ saves_remove_last_undo_file_name (
     }
   
 } // end saves_remove_undo_file_name
+
+
+gchar *
+saves_get_save_file_name (
+                          Saves       *s,
+                          Screen      *screen,
+                          const char  *id,
+                          char       **err
+                          )
+{
+
+  int slot_num;
+
+  
+  slot_num= select_save_slot ( s, screen, id, err );
+  if ( slot_num == -1 ) return NULL;
+  else if ( slot_num == 0 )
+    {
+      msgerror ( err, "no save slot selected" );
+      return NULL;
+    }
+  
+  return get_save_slot_name ( s, id, slot_num );
+  
+} // end saves_get_save_file_name
