@@ -1182,3 +1182,55 @@ state_enable_trace (
     }
   
 } // end state_enable_trace
+
+
+bool
+state_restart (
+               State  *state,
+               char  **err
+               )
+{
+
+  uint8_t *mem;
+  uint32_t i,beg,end;
+  
+  
+  // Memòria.
+  mem= g_new ( uint8_t, state->mem_size );
+  memcpy ( mem, state->sf->data, state->mem_size );
+  // --> Copia capçalera
+  for ( i= 0; i < 56; ++i )
+    mem[i]= state->mem[i];
+  // --> Copia capçalera ext.
+  beg= (((uint32_t) state->mem[0x36])<<8) | ((uint32_t) state->mem[0x37]);
+  if ( state->sf->data[0] >= 5 && beg != 0 )
+    {
+      end= beg + 14;
+      if ( end > state->mem_size )
+        end= state->mem_size;
+      for ( i= beg; i < end; ++i )
+        mem[i]= state->mem[i];
+    }
+  // --> Fixa memòria
+  memcpy ( state->mem, mem, state->mem_size );
+  g_free ( mem );
+  // --> Reseteja capçalera.
+  reset_header_values ( state, false );
+  
+  // PC
+  state->PC=
+    (((uint32_t) state->sf->data[0x6])<<8) |
+    ((uint32_t) state->sf->data[0x7]);
+
+  // Stack
+  state->frame_ind= 0;
+  if ( state->sf->data[0] == 6 )
+    {
+      if ( !call_main ( state, err ) )
+        return false;
+    }
+  else create_dummy_frame ( state );
+  
+  return true;
+  
+} // end state_restart

@@ -1508,7 +1508,9 @@ decode_next_inst (
             return false;
         }
       break;
-      
+    case 0xb7: // restart
+      ins->name= INSTRUCTION_NAME_RESTART;
+      break;
     case 0xb8: // ret_popped;
       ins->name= INSTRUCTION_NAME_RET_POPPED;
       break;

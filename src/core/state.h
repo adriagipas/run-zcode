@@ -168,4 +168,11 @@ state_enable_trace (
                     const bool  enable
                     );
 
+// Torna cert si tot ha anat bé.
+bool
+state_restart (
+               State  *state,
+               char  **err
+               );
+
 #endif // __CORE__STATE_H__

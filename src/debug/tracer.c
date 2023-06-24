@@ -126,6 +126,7 @@ get_inst_name (
     case INSTRUCTION_NAME_READ            : return "read            ";
     case INSTRUCTION_NAME_READ_CHAR       : return "read_char       ";
     case INSTRUCTION_NAME_REMOVE_OBJ      : return "remove_obj      ";
+    case INSTRUCTION_NAME_RESTART         : return "restart         ";
     case INSTRUCTION_NAME_RESTORE         : return "restore         ";
     case INSTRUCTION_NAME_RESTORE_UNDO    : return "restore_undo    ";
     case INSTRUCTION_NAME_RET             : return "ret             ";

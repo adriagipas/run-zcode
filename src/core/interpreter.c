@@ -5067,7 +5067,7 @@ exec_next_inst (
                                    &result_var, true, err ) )
             return RET_ERROR;
           res= save ( intp, ops, 0 );
-          if ( !write_var ( intp, result_var, res, err ) ) return false;
+          if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
         }
       else goto wrong_version;
       break;
@@ -5089,11 +5089,17 @@ exec_next_inst (
                                        &result_var, true, err ) )
                 return RET_ERROR;
             }
-          if ( !write_var ( intp, result_var, res, err ) ) return false;
+          if ( !write_var ( intp, result_var, res, err ) ) return RET_ERROR;
         }
       else goto wrong_version;
       break;
-      
+    case 0xb7: // restart
+      if ( !state_restart ( intp->state, err ) ) return RET_ERROR;
+      if ( intp->version <= 3 )
+        {
+          if ( !show_status_line ( intp, err ) ) return RET_ERROR;
+        }
+      break;
     case 0xb8: // ret_popped
       if ( !state_readvar ( intp->state, 0, &op1, true, err ) )
         return RET_ERROR;
