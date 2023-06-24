@@ -12,6 +12,7 @@ Requirements:
 - [SDL 2.0](https://github.com/libsdl-org/SDL)
 - [SDL_image 2.0](https://github.com/libsdl-org/SDL_image)
 - [SDL_ttf 2.0](https://github.com/libsdl-org/SDL_ttf)
+- [Fontconfig](https://gitlab.freedesktop.org/fontconfig/fontconfig)
 
 Git clone run-zcode
 ```
@@ -49,3 +50,34 @@ the destination file
 ```
 run-zcode -T transcript.txt example.z5
 ```
+
+## Configuration file
+
+A default configuration file looks like this
+```
+[Screen]
+lines=25
+width=80
+fullscreen=false
+
+[Fonts]
+size=8
+normal-roman=sans
+normal-bold=sans:style=bold
+normal-italic=sans:style=italic
+normal-bold-italic=sans:bold:italic
+fpitch-roman=mono
+fpitch-bold=mono:style=bold
+fpitch-italic=mono:style=italic
+fpitch-bold-italic=mono:bold:italic
+```
+
+**Screen** options control the window shape:
+- *lines*: number of lines
+- *width*: number of monospace characters
+- *fullscreen*: run story file in full screen mode.
+
+**Fonts** options control fonts shape:
+- *size*: font size
+- *normal-*: a regular font
+- *fpitch-*: a fixed pitch font

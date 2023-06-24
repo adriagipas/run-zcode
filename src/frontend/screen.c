@@ -971,7 +971,8 @@ screen_new (
       if ( icon_sf == NULL ) goto error;
     }
   else icon_sf= NULL;
-  ret->_win= window_new ( ret->_width, ret->_height,
+  ret->_win= window_new ( conf->screen_fullscreen ? 0 : ret->_width,
+                          ret->_height,
                           ret->_width, ret->_height,
                           title, icon_sf, err );
   if ( ret->_win == NULL ) goto error;
