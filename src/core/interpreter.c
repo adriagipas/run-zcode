@@ -5861,7 +5861,8 @@ interpreter_new_from_file_name (
     }
   else
     {
-      ret->screen= screen_new ( conf, ret->sf->data[0], "Prova",
+      ret->screen= screen_new ( conf, ret->sf->data[0],
+                                story_file_get_title ( ret->sf ),
                                 icon, icon_size, verbose, err );
       if ( ret->screen == NULL ) goto error;
     }

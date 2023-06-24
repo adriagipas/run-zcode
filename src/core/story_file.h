@@ -70,6 +70,8 @@ typedef struct
                                    // 'PICTURE'. Si el seu valor es >=
                                    // Nres vol dir que no hi ha.
   char               id[STORY_FILE_IDSIZE]; // Identificador.
+  char              *file_name;    // File name.
+  char              *title;
   
 } StoryFile;
 
@@ -106,6 +108,11 @@ story_file_get_frontispiece (
                              size_t     *size,
                              char      **err
                              );
+
+const gchar *
+story_file_get_title (
+                      StoryFile *sf
+                      );
 
 // ID del StoryFile
 #define story_file_GETID(SF) ((SF)->id)

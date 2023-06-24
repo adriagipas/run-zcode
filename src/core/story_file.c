@@ -52,6 +52,20 @@
 
 
 
+/*********/
+/* TIPUS */
+/*********/
+
+typedef struct
+{
+  char  *text;
+  char   text_size;
+  bool   in_title;
+} get_title_aux_t;
+
+
+
+
 /*********************/
 /* FUNCIONS PRIVADES */
 /*********************/
@@ -143,6 +157,8 @@ new_from_zfile (
 
   // Reserva i prepara.
   ret= g_new ( StoryFile, 1 );
+  ret->file_name= NULL;
+  ret->title= NULL;
   ret->data= NULL;
   ret->resources= NULL;
   ret->Nres= 0;
@@ -545,6 +561,8 @@ new_from_blorb (
 
   // Inicialitza i prepara.
   ret= g_new ( StoryFile, 1 );
+  ret->file_name= NULL;
+  ret->title= NULL;
   ret->data= NULL;
   ret->resources= NULL;
   ret->Nres= 0;
@@ -630,6 +648,142 @@ build_id (
 } // end build_id
 
 
+static void
+get_title_start_element (
+                         GMarkupParseContext  *context,
+                         const gchar          *element_name,
+                         const gchar         **attribute_names,
+                         const gchar         **attribute_values,
+                         gpointer              user_data,
+                         GError              **error
+                         )
+{
+
+  get_title_aux_t *aux;
+
+
+  aux= (get_title_aux_t *) user_data;
+  if ( !aux->in_title && !strcmp ( element_name, "title" ) )
+    aux->in_title= true;
+  
+} // end get_title_start_element
+
+
+static void
+get_title_end_element (
+                       GMarkupParseContext  *context,
+                       const gchar          *element_name,
+                       gpointer              user_data,
+                       GError              **error
+                       )
+{
+
+  get_title_aux_t *aux;
+
+
+  aux= (get_title_aux_t *) user_data;
+  if ( aux->in_title && !strcmp ( element_name, "title" ) )
+    aux->in_title= false;
+  
+} // end get_title_end_element
+
+
+static void
+get_title_text (
+                GMarkupParseContext  *context,
+                const gchar          *text,
+                gsize                 text_len,
+                gpointer              user_data,
+                GError              **error
+                )
+{
+
+  get_title_aux_t *aux;
+  size_t nsize,i;
+  
+  
+  aux= (get_title_aux_t *) user_data;
+  if ( aux->in_title && text_len > 0 )
+    {
+
+      // Faig una comprobació, però si falla torne i ja.
+      nsize= aux->text_size + text_len;
+      if ( nsize <= aux->text_size ) return;
+
+      // Còpia.
+      aux->text= g_renew ( char, aux->text, nsize );
+      for ( i= 0; i < text_len; ++i )
+        aux->text[i+aux->text_size-1]= text[i];
+      aux->text_size= nsize;
+      
+    }
+  
+} // end get_title_text
+
+
+// No faig res.
+static void
+get_title_error (
+                 GMarkupParseContext *context,
+                 GError              *error,
+                 gpointer             user_data
+                 )
+{
+} // end get_title_error
+
+
+// Els errors els ignore.
+static const char *
+get_title (
+           StoryFile *sf
+           )
+{
+
+  get_title_aux_t aux;
+  GMarkupParser p= {
+    get_title_start_element,
+    get_title_end_element,
+    get_title_text,
+    NULL,
+    get_title_error
+  };
+  GMarkupParseContext *context;
+  
+  
+  // Ja tenim el títol.
+  if ( sf->title != NULL ) return sf->title;
+
+  // No tenim metadades.
+  if ( sf->raw_metadata == NULL ) return NULL;
+
+  // Busca títol.
+  // --> Prepara memòria.
+  aux.text= g_new ( char, 1 );
+  aux.text_size= 1;
+  aux.in_title= false;
+
+  // --> Parseja.
+  context= g_markup_parse_context_new
+    ( &p, G_MARKUP_DEFAULT_FLAGS, &aux, NULL );
+  g_markup_parse_context_parse ( context,
+                                 sf->raw_metadata,
+                                 strlen ( sf->raw_metadata ),
+                                 NULL );
+  g_markup_parse_context_free ( context );
+  
+  // --> Desa en title
+  if ( aux.text_size > 1 )
+    {
+      aux.text[aux.text_size-1]= '\0';
+      sf->title= aux.text;
+    }
+  else g_free ( aux.text );
+  
+  return sf->title;
+  
+} // end get_title
+
+
 
 
 /**********************/
@@ -645,6 +799,8 @@ story_file_free (
   uint32_t n;
 
 
+  g_free ( sf->title );
+  g_free ( sf->file_name );
   if ( sf->raw_metadata != NULL ) g_free ( sf->raw_metadata );
   if ( sf->fres != NULL ) fclose ( sf->fres );
   if ( sf->data != NULL ) g_free ( sf->data );
@@ -692,6 +848,7 @@ story_file_new_from_file_name (
     ret= new_from_blorb ( file_name, err );
   else
     ret= new_from_zfile ( file_name, err );
+  ret->file_name= g_path_get_basename ( file_name );
 
   // Crea id
   build_id ( ret );
@@ -757,3 +914,20 @@ story_file_get_frontispiece (
   return false;
   
 } // end story_file_get_frontispiece
+
+
+const gchar *
+story_file_get_title (
+                      StoryFile *sf
+                      )
+{
+
+  const char *ret;
+
+
+  ret= get_title ( sf );
+  if ( ret == NULL ) ret= sf->file_name;
+  
+  return ret;
+  
+} // end story_file_get_title
