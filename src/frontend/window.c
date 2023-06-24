@@ -126,14 +126,14 @@ calc_desp_rgba (
 
 static bool
 init_sdl (
-          Window      *win,
-          const int    wwidth,
-          const int    wheight,
-          const int    fbwidth,
-          const int    fbheight,
-          const char  *title,
-          const int   *icon,
-          char       **err
+          Window       *win,
+          const int     wwidth,
+          const int     wheight,
+          const int     fbwidth,
+          const int     fbheight,
+          const char   *title,
+          SDL_Surface  *icon,
+          char        **err
           )
 {
 
@@ -177,9 +177,8 @@ init_sdl (
     }
 
   // Fixa la icona
-  if ( icon != NULL )
-    ee ( "CAL_IMPLEMENTAR ICONA!!!!" );
-
+  if ( icon != NULL ) SDL_SetWindowIcon ( win->_win, icon );
+  
   // Amaga el cursor.
   win->_cursor_enabled= false;
   SDL_ShowCursor ( 0 );
@@ -312,13 +311,13 @@ window_free (
 
 Window *
 window_new (
-            const int    window_width,
-            const int    window_height,
-            const int    fb_width,
-            const int    fb_height,
-            const char  *title, // Pot ser NULL
-            const int   *icon,  // Pot ser NULL
-            char       **err
+            const int     window_width,
+            const int     window_height,
+            const int     fb_width,
+            const int     fb_height,
+            const char   *title, // Pot ser NULL
+            SDL_Surface  *icon,
+            char        **err
             )
 {
 

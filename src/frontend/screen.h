@@ -146,6 +146,8 @@ screen_new (
             Conf            *conf,
             const int        version,
             const char      *title,
+            const uint8_t   *icon, // Pot ser NULL
+            const size_t     icon_size,
             const gboolean   verbose,
             char           **err
             );

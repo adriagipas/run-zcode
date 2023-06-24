@@ -56,18 +56,16 @@ window_free (
 
 // window_width i window_height són les dimensions de la finestra,
 // fbwidth i fbheight són les dimensions del framebuffer, title és el
-// títol, i icon és una icona on icon[0] i icon[1] són l'amplada i
-// altura respectivament. wwidth<=0 || wheight<=0 indica pantalla
-// completa.
+// títol. Si icon és NULL no es fica icona.
 Window *
 window_new (
-            const int    window_width,
-            const int    window_height,
-            const int    fb_width,
-            const int    fb_height,
-            const char  *title,
-            const int   *icon,  // Pot ser NULL
-            char       **err
+            const int     window_width,
+            const int     window_height,
+            const int     fb_width,
+            const int     fb_height,
+            const char   *title,
+            SDL_Surface  *icon,
+            char        **err
             );
 
 // Torna true si s'ha pogut llegir un event.

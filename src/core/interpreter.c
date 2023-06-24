@@ -5825,9 +5825,12 @@ interpreter_new_from_file_name (
 
   Interpreter *ret;
   uint32_t std_dict_addr,alphabet_table_addr;
+  uint8_t *icon;
+  size_t icon_size;
   
   
   // Prepara.
+  icon= NULL;
   ret= g_new ( Interpreter, 1 );
   ret->sf= NULL;
   ret->state= NULL;
@@ -5849,6 +5852,8 @@ interpreter_new_from_file_name (
   if ( ret->sf == NULL ) goto error;
 
   // Inicialitza pantalla
+  if ( !story_file_get_frontispiece ( ret->sf, &icon, &icon_size, err ) )
+    goto error;
   if ( ret->sf->data[0] == 6 )
     {
       msgerror ( err, "Screen model V6 not supported" );
@@ -5857,9 +5862,10 @@ interpreter_new_from_file_name (
   else
     {
       ret->screen= screen_new ( conf, ret->sf->data[0], "Prova",
-                                verbose, err );
+                                icon, icon_size, verbose, err );
       if ( ret->screen == NULL ) goto error;
     }
+  g_free ( icon ); icon= NULL;
   
   // Crea estat.
   ret->state= state_new ( ret->sf, ret->screen, tracer, err );
@@ -5957,6 +5963,7 @@ interpreter_new_from_file_name (
   return ret;
   
  error:
+  g_free ( icon );
   interpreter_free ( ret );
   return NULL;
   

@@ -97,6 +97,16 @@ story_file_read_resource (
                           char           **err
                           );
 
+// Llig en 'mem' (reserva memòria) la portada. Si no en té assigna
+// NULL (no és considera error). Torna false en cas d'error.
+bool
+story_file_get_frontispiece (
+                             StoryFile  *sf,
+                             uint8_t   **mem,
+                             size_t     *size,
+                             char      **err
+                             );
+
 // ID del StoryFile
 #define story_file_GETID(SF) ((SF)->id)
 

@@ -724,3 +724,36 @@ story_file_read_resource (
   return false;
   
 } // end story_file_read_resource
+
+
+bool
+story_file_get_frontispiece (
+                             StoryFile  *sf,
+                             uint8_t   **mem,
+                             size_t     *size,
+                             char      **err
+                             )
+{
+
+  // Prepara.
+  *mem= NULL;
+  *size= 0;
+
+  // Llig.
+  if ( sf->frontispiece < sf->Nres )
+    {
+      *size= sf->resources[sf->frontispiece].size;
+      *mem= g_new ( uint8_t, *size );
+      if ( !story_file_read_resource ( sf, sf->frontispiece, *mem, err ) )
+        goto error;
+    }
+  
+  return true;
+  
+ error:
+  if ( *mem != NULL ) g_free ( *mem );
+  *mem= NULL;
+  *size= 0;
+  return false;
+  
+} // end story_file_get_frontispiece

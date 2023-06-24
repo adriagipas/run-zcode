@@ -31,6 +31,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <SDL.h>
+#include <SDL_image.h>
 #include <SDL_ttf.h>
 
 #include "screen.h"
@@ -815,6 +816,43 @@ erase_window (
 } // end erase_window
 
 
+// Torna NULL en cas d'error.
+static SDL_Surface *
+load_icon (
+           const uint8_t  *icon,
+           const size_t    icon_size,
+           char          **err
+           )
+{
+
+  SDL_RWops *rw;
+  SDL_Surface *ret;
+  
+
+  // Prepara.
+  rw= NULL;
+  ret= NULL;
+  
+  // Carrega.
+  rw= SDL_RWFromConstMem ( icon, (int) icon_size );
+  if ( rw == NULL ) goto error_sdl;
+  ret= IMG_Load_RW ( rw, 0 );
+  if ( ret == NULL ) goto error_sdl;
+  
+  // Allibera memòria.
+  SDL_RWclose ( rw );
+
+  return ret;
+  
+ error_sdl:
+  if ( ret != NULL ) SDL_FreeSurface ( ret );
+  if ( rw != NULL ) SDL_RWclose ( rw );
+  msgerror ( err, "Failed to load icon: %s", SDL_GetError () );
+  return NULL;
+  
+} // end load_icon
+
+
 
 
 /**********************/
@@ -857,19 +895,23 @@ screen_new (
             Conf            *conf,
             const int        version,
             const char      *title,
+            const uint8_t   *icon, // Pot ser NULL
+            const size_t     icon_size,
             const gboolean   verbose,
             char           **err
             )
 {
-
+  
   Screen *ret;
   int n;
   uint32_t color;
+  SDL_Surface *icon_sf;
   
-
+  
   assert ( version >= 1 && version <= 8 && version != 6 );
   
   // Prepara.
+  icon_sf= NULL;
   ret= g_new ( Screen, 1 );
   ret->_conf= conf;
   ret->_win= NULL;
@@ -923,12 +965,20 @@ screen_new (
     }
 
   // Crea finestra.
+  if ( icon != NULL )
+    {
+      icon_sf= load_icon ( icon, icon_size, err );
+      if ( icon_sf == NULL ) goto error;
+    }
+  else icon_sf= NULL;
   ret->_win= window_new ( ret->_width, ret->_height,
                           ret->_width, ret->_height,
-                          title, NULL, err );
+                          title, icon_sf, err );
   if ( ret->_win == NULL ) goto error;
+  if ( icon_sf != NULL ) SDL_FreeSurface ( icon_sf );
+  icon_sf= NULL;
   window_show ( ret->_win );
-
+  
   // Inicialitza framebuffer
   ret->_fb= g_new ( uint32_t, ret->_width*ret->_height );
   if ( ret->_version <= 3 )
@@ -998,6 +1048,7 @@ screen_new (
   return ret;
   
  error:
+  if ( icon_sf != NULL ) SDL_FreeSurface ( icon_sf );
   screen_free ( ret );
   return NULL;
   

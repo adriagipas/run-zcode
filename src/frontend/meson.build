@@ -12,4 +12,4 @@ FRONTEND= static_library('frontend',
                          'window.h',
                          'window.c',
                          include_directories: [ROOT_H],
-                         dependencies : [GLIB2,FONTCONFIG,SDL2TTF,SDL2])
+                         dependencies : [GLIB2,FONTCONFIG,SDL2TTF,SDL2IMG,SDL2])
