@@ -419,10 +419,12 @@ find_quetzal_chunks (
   size_t n;
 
 
-  // Cerca
+  // Cerca (Inicialitza tots els camps per warnings)
   ifhd->type[0]= '\0';
-  cmem->type[0]= '\0';
-  stks->type[0]= '\0';
+  ifhd->length= 0; // CALLA!!
+  ifhd->offset= 0; // CALLA!!
+  *cmem= *ifhd;
+  *stks= *ifhd;
   for ( n= 0; n < iff->N; ++n )
     if ( strcmp ( iff->chunks[n].type, "IFhd" ) == 0 )
       *ifhd= iff->chunks[n];
@@ -464,8 +466,11 @@ load_quetzal_ifhd (
 {
 
   uint8_t *data;
+  
 
-
+  // Prepara.
+  data= NULL;
+  
   // Obté dades
   if ( fseek ( f, chunk->offset+8, SEEK_SET ) != 0 )
     { error_read_file ( err, file_name ); goto error; }
@@ -545,6 +550,9 @@ load_quetzal_cmem (
   uint8_t flags2_10,flags2_11,val;
   uint32_t i,pos,num_zeros,j;
   
+
+  // Prepara.
+  data= NULL;
   
   // Obté dades
   if ( fseek ( f, chunk->offset+8, SEEK_SET ) != 0 )
@@ -618,6 +626,9 @@ load_quetzal_stks (
   uint32_t i,num_local_vars,num_words_eval,total_extra,j;
   uint16_t pos;
   
+
+  // Prepara.
+  data= NULL;
   
   // Obté dades
   if ( fseek ( f, chunk->offset+8, SEEK_SET ) != 0 )

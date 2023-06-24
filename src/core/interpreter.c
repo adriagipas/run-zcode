@@ -2403,6 +2403,7 @@ print_output3 (
   
   o_ind= intp->ostreams.N3-1;
   unicode_count= 0;
+  unicode_val= 0; // Calla.
   for ( p= text; *p != '\0'; ++p )
     {
 
@@ -2979,7 +2980,12 @@ sread (
       call_routine= true;
       time_microsecs= ((gint64) ((uint64_t) time))*100000;
     }
-  else call_routine= false;
+  else
+    {
+      call_routine= false;
+      t0= 0; // CALLA!!!
+      time_microsecs= 0; // CALLA!!
+    }
 
   // Status line
   if ( intp->version <= 3 )

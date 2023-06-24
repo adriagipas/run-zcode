@@ -599,7 +599,7 @@ print_line (
           // --> Allibera memòria
           SDL_FreeSurface ( surface );
         }
-      else new_width= draw_w;
+      else new_width= c->width; // ???
 
       // Actualitza c
       c->N= new_N;

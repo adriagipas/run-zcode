@@ -92,7 +92,7 @@ usage (
       FALSE,  // verbose
       FALSE,  // debug
       NULL,   // conf_fn
-      NULL
+      NULL    // transcript_fn
     };
 
   static GOptionEntry entries[]=
@@ -177,16 +177,16 @@ int main ( int argc, char *argv[] )
   err= NULL;
   intp= NULL;
   conf= NULL;
-  if ( SDL_Init ( SDL_INIT_VIDEO|SDL_INIT_EVENTS ) != 0 )
-    {
-      msgerror ( &err, "Failed to initialize SDL: %s", SDL_GetError () );
-      goto error;
-    }
   
   // Parseja opcions i configuració.
   usage ( &argc, &argv, &args, &opts );
   conf= conf_new ( opts.verbose, opts.conf_fn, &err );
   if ( conf == NULL ) goto error;
+  if ( SDL_Init ( SDL_INIT_VIDEO|SDL_INIT_EVENTS ) != 0 )
+    {
+      msgerror ( &err, "Failed to initialize SDL: %s", SDL_GetError () );
+      goto error;
+    }
   
   // Executa.
   if ( opts.debug )
