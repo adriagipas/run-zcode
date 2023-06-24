@@ -31,21 +31,21 @@ meson install
 
 In order to run a Z-Machine story file (*example.z5*) just type
 ```
-run-zcode **example.z5**
+run-zcode example.z5
 ```
 or for a more verbose execution
 ```
-run-zcode -v **example.z5**
+run-zcode -v example.z5
 ```
 
 It is also possible to specify a custom configuration file (*example.conf*)
 ```
-run-zcode -c **example.conf** **example.z5**
+run-zcode -c example.conf example.z5
 ```
 
 By default, the game transcript (output stream 2) is redirected to the
 standard output. Using option *-T,--transcript* it is possible changed
 the destination file
 ```
-run-zcode -T **transcript.txt** **example.z5**
+run-zcode -T transcript.txt example.z5
 ```
