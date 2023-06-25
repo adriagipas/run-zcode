@@ -53,7 +53,7 @@ run-zcode -T transcript.txt example.z5
 
 It is also possible to extract the frontispiece (cover art) from a
 zblorb file using the option *-C,--cover*. For example, it could be
-use to generate thumbnails with thumbnailer like this:
+used to generate thumbnails with thumbnailer like this:
 ```
 [Thumbnailer Entry]
 Version=1.0
