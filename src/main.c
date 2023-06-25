@@ -32,6 +32,7 @@
 #include <SDL.h>
 
 #include "core/interpreter.h"
+#include "core/story_file.h"
 #include "debug/debugger.h"
 #include "frontend/conf.h"
 #include "utils/error.h"
@@ -68,6 +69,7 @@ struct opts
   gboolean  debug;
   gchar    *conf_fn;
   gchar    *transcript_fn;
+  gchar    *cover_fn;
   
 };
 
@@ -92,7 +94,8 @@ usage (
       FALSE,  // verbose
       FALSE,  // debug
       NULL,   // conf_fn
-      NULL    // transcript_fn
+      NULL,   // transcript_fn
+      NULL    // cover_fn
     };
 
   static GOptionEntry entries[]=
@@ -107,6 +110,11 @@ usage (
         " standard configuration file" },
       { "transcript", 'T', 0, G_OPTION_ARG_STRING, &vals.transcript_fn,
         "Specify the file used to write the transcription" },
+      { "cover", 'C', 0, G_OPTION_ARG_STRING, &vals.cover_fn,
+        "Extract the frontispiece image (cover) and store it in the"
+        " provided file. When this option is selected the story file"
+        " is not executed. If no frontispiece image is present in the"
+        " story file the application fails." },
       { NULL }
     };
   
@@ -147,10 +155,82 @@ free_opts (
            )
 {
 
+  g_free ( opts->cover_fn );
   g_free ( opts->transcript_fn );
   g_free ( opts->conf_fn );
   
 } // end free_opts
+
+
+// Torna cert si s'ha pogut extraure.
+static bool
+extract_cover (
+               const gchar *sf_fn,
+               const gchar *cover_fn
+               )
+{
+
+  const size_t BLOCK_SIZE= 1024;
+  
+  char *err;
+  StoryFile *sf;
+  uint8_t *data,*p;
+  size_t size,remain,writeb;
+  bool exist_cover;
+  FILE *f;
+  
+  
+  // Prepara.
+  err= NULL;
+  sf= NULL;
+  data= NULL;
+  f= NULL;
+  exist_cover= true;
+
+  // Extrau imatge.
+  sf= story_file_new_from_file_name ( sf_fn, &err );
+  if ( sf == NULL ) goto error;
+  if ( !story_file_get_frontispiece ( sf, &data, &size, &err ) )
+    goto error;
+  exist_cover= data!=NULL;
+
+  // Escriu en fitxer.
+  if ( exist_cover )
+    {
+      f= fopen ( cover_fn, "wb" );
+      if ( f == NULL )
+        {
+          msgerror ( &err, "Failed to create '%s'", cover_fn );
+          goto error;
+        }
+      remain= size;
+      p= data;
+      while ( remain > 0 )
+        {
+          writeb= remain > BLOCK_SIZE ? BLOCK_SIZE : remain;
+          if ( fwrite ( p, writeb, 1, f ) != 1 )
+            goto error;
+          p+= writeb;
+          remain-= writeb;
+        }
+      fclose ( f );
+    }
+  
+  // Allibera memòria.
+  g_free ( data );
+  story_file_free ( sf );
+  
+  return exist_cover;
+  
+ error:
+  if ( f != NULL ) fclose ( f );
+  g_free ( data );
+  if ( sf != NULL ) story_file_free ( sf );
+  fprintf ( stderr, "[EE] %s\n", err  );
+  g_free ( err );
+  return false;
+  
+} // end extract_cover
 
 
 
@@ -167,8 +247,9 @@ int main ( int argc, char *argv[] )
   Interpreter *intp;
   Conf *conf;
   char *err;
+  bool ok;
   
-
+  
   // Prepara.
   setlocale ( LC_ALL, "" );
   bindtextdomain ( GETTEXT_PACKAGE, GETTEXT_LOCALEDIR );
@@ -180,6 +261,13 @@ int main ( int argc, char *argv[] )
   
   // Parseja opcions i configuració.
   usage ( &argc, &argv, &args, &opts );
+  // --> Cas especial extraure cover
+  if ( opts.cover_fn != NULL )
+    {
+      ok= extract_cover ( args.zcode_fn, opts.cover_fn );
+      free_opts ( &opts );
+      return ok ? EXIT_SUCCESS : EXIT_FAILURE;
+    }
   conf= conf_new ( opts.verbose, opts.conf_fn, &err );
   if ( conf == NULL ) goto error;
   if ( SDL_Init ( SDL_INIT_VIDEO|SDL_INIT_EVENTS ) != 0 )
