@@ -51,6 +51,37 @@ the destination file
 run-zcode -T transcript.txt example.z5
 ```
 
+It is also possible to extract the frontispiece (cover art) from a
+zblorb file using the option *-C,--cover*. For example, it could be
+use to generate thumbnails with thumbnailer like this:
+```
+[Thumbnailer Entry]
+Version=1.0
+Encoding=UTF-8
+Type=X-Thumbnailer
+Name=zblorb Thumbnailer
+MimeType=application/x-zblorb;
+Exec=sh -c '/home/USER/bin/zmachinethumbs.sh "%i" "%o" %s'
+```
+where *zmachinethumbs.sh* is:
+```
+if [ $# != 3 ]; then
+  echo "$0: input_file_name output_file_name size"
+  exit 1
+fi
+ 
+INPUT_FILE="$1"
+OUTPUT_FILE="$2"
+SIZE=$3
+
+if TEMP=$(mktemp --directory --tmpdir tumbler-zblorb-XXXXXX); then
+    if /home/USER/bin/run-zcode "$INPUT_FILE" -C "$TEMP/out"; then
+        convert -thumbnail "$SIZE" "$TEMP/out" "$OUTPUT_FILE" 2>/dev/null	
+    fi
+    rm -rf $TEMP
+fi
+```
+
 ## Configuration file
 
 A default configuration file looks like this
